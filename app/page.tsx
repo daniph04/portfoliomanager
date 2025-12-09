@@ -6,8 +6,9 @@ import { usePersistentGroupData } from "@/lib/useGroupData";
 
 export default function LoginPage() {
     const router = useRouter();
-    const { helpers, session, isLoading } = usePersistentGroupData();
+    const { helpers, session, isLoading, appState } = usePersistentGroupData();
 
+    const [mode, setMode] = useState<"join" | "create">("join");
     const [groupName, setGroupName] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
@@ -29,21 +30,38 @@ export default function LoginPage() {
         const trimmedPassword = password.trim();
 
         if (!trimmedName) {
-            setError("Please enter a group name");
+            setError("Por favor ingresa un nombre de grupo");
             return;
         }
         if (!trimmedPassword) {
-            setError("Please enter a password");
+            setError("Por favor ingresa una contraseña");
             return;
         }
 
-        const group = helpers.findGroup(trimmedName, trimmedPassword);
-        if (!group) {
-            setError("Group not found or incorrect password");
-            return;
+        if (mode === "join") {
+            // Try to find and join existing group
+            const group = helpers.findGroup(trimmedName, trimmedPassword);
+            if (!group) {
+                setError("Grupo no encontrado o contraseña incorrecta");
+                return;
+            }
+            helpers.setSession(group.id, null);
+            router.push("/select-profile");
+        } else {
+            // Create new group
+            // Check if group name already exists
+            const existingGroup = appState.groups.find(
+                g => g.name.toLowerCase() === trimmedName.toLowerCase()
+            );
+            if (existingGroup) {
+                setError("Ya existe un grupo con ese nombre");
+                return;
+            }
+
+            const newGroup = helpers.createGroup(trimmedName, trimmedPassword);
+            helpers.setSession(newGroup.id, null);
+            router.push("/select-profile");
         }
-        helpers.setSession(group.id, null);
-        router.push("/select-profile");
     };
 
     if (isLoading) {
@@ -79,39 +97,58 @@ export default function LoginPage() {
                         </svg>
                     </div>
                     <h1 className="text-3xl font-bold text-slate-100">Portfolio League</h1>
-                    <p className="text-slate-400 mt-2">Track investments with your friends</p>
+                    <p className="text-slate-400 mt-2">Compite con tus amigos</p>
                 </div>
 
                 {/* Login Card */}
-                <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl">
-                    <div className="text-center mb-6">
-                        <h2 className="text-xl font-semibold text-slate-100">Join Your Group</h2>
-                        <p className="text-slate-400 text-sm mt-1">Enter the group name and password</p>
+                <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 shadow-2xl">
+                    {/* Toggle Buttons */}
+                    <div className="flex gap-2 mb-6">
+                        <button
+                            type="button"
+                            onClick={() => { setMode("join"); setError(""); }}
+                            className={`flex-1 py-2.5 rounded-xl font-medium transition-all ${mode === "join"
+                                    ? "bg-emerald-600 text-white"
+                                    : "bg-slate-800 text-slate-400 hover:text-white"
+                                }`}
+                        >
+                            Unirse
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setMode("create"); setError(""); }}
+                            className={`flex-1 py-2.5 rounded-xl font-medium transition-all ${mode === "create"
+                                    ? "bg-emerald-600 text-white"
+                                    : "bg-slate-800 text-slate-400 hover:text-white"
+                                }`}
+                        >
+                            Crear Grupo
+                        </button>
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">
-                                Group Name
+                                Nombre del grupo
                             </label>
                             <input
                                 type="text"
                                 value={groupName}
                                 onChange={(e) => setGroupName(e.target.value)}
-                                placeholder="Enter group name..."
+                                placeholder={mode === "create" ? "Mi grupo de inversión" : "Nombre del grupo..."}
                                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                             />
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">
-                                Password
+                                Contraseña
                             </label>
                             <input
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                placeholder="Enter group password..."
+                                placeholder={mode === "create" ? "Elige una contraseña" : "Contraseña del grupo..."}
                                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                             />
                         </div>
@@ -126,12 +163,14 @@ export default function LoginPage() {
                             type="submit"
                             className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/20"
                         >
-                            Join Group
+                            {mode === "create" ? "Crear Grupo" : "Unirse al Grupo"}
                         </button>
                     </form>
 
                     <p className="text-center text-slate-500 text-sm mt-6">
-                        Ask your group admin for the name and password
+                        {mode === "join"
+                            ? "Pide el nombre y contraseña al admin del grupo"
+                            : "Crea un grupo y comparte las credenciales"}
                     </p>
                 </div>
             </div>
