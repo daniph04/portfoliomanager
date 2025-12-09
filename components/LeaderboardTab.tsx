@@ -331,16 +331,17 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                 </div>
             )}
 
-            {/* Best & Worst Trades */}
-            {hasAnyHoldings && (bestTrades.length > 0 || worstTrades.length > 0) && (
+            {/* Best & Worst Trades - Always show both side by side */}
+            {hasAnyHoldings && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {bestTrades.length > 0 && (
-                        <div className="bg-slate-900/50 backdrop-blur-xl border border-emerald-500/30 rounded-2xl overflow-hidden">
-                            <div className="px-4 py-3 border-b border-slate-800 bg-emerald-500/5">
-                                <h3 className="font-semibold text-emerald-400 flex items-center gap-2">
-                                    <span>🚀</span> Mejores Trades
-                                </h3>
-                            </div>
+                    {/* Best Trades - Left */}
+                    <div className="bg-slate-900/50 backdrop-blur-xl border border-emerald-500/30 rounded-2xl overflow-hidden">
+                        <div className="px-4 py-3 border-b border-slate-800 bg-emerald-500/5">
+                            <h3 className="font-semibold text-emerald-400 flex items-center gap-2">
+                                <span>🚀</span> Mejores Trades
+                            </h3>
+                        </div>
+                        {bestTrades.length > 0 ? (
                             <div className="divide-y divide-slate-800">
                                 {bestTrades.map((trade, idx) => (
                                     <div key={trade.holding.id} className="flex items-center gap-3 p-3">
@@ -360,16 +361,21 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                                     </div>
                                 ))}
                             </div>
-                        </div>
-                    )}
-
-                    {worstTrades.length > 0 && (
-                        <div className="bg-slate-900/50 backdrop-blur-xl border border-red-500/30 rounded-2xl overflow-hidden">
-                            <div className="px-4 py-3 border-b border-slate-800 bg-red-500/5">
-                                <h3 className="font-semibold text-red-400 flex items-center gap-2">
-                                    <span>📉</span> Peores Trades
-                                </h3>
+                        ) : (
+                            <div className="p-6 text-center text-slate-500">
+                                Sin trades positivos aún
                             </div>
+                        )}
+                    </div>
+
+                    {/* Worst Trades - Right */}
+                    <div className="bg-slate-900/50 backdrop-blur-xl border border-red-500/30 rounded-2xl overflow-hidden">
+                        <div className="px-4 py-3 border-b border-slate-800 bg-red-500/5">
+                            <h3 className="font-semibold text-red-400 flex items-center gap-2">
+                                <span>📉</span> Peores Trades
+                            </h3>
+                        </div>
+                        {worstTrades.length > 0 ? (
                             <div className="divide-y divide-slate-800">
                                 {worstTrades.map((trade, idx) => (
                                     <div key={trade.holding.id} className="flex items-center gap-3 p-3">
@@ -389,8 +395,13 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                                     </div>
                                 ))}
                             </div>
-                        </div>
-                    )}
+                        ) : (
+                            <div className="p-6 text-center">
+                                <span className="text-2xl">🎉</span>
+                                <p className="text-emerald-400 font-medium mt-1">¡Ninguno en rojo!</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 
