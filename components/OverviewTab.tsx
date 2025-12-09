@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { GroupState, Holding } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
-import { getTotalPortfolioValue, getTotalPnl, getTotalPnlPercent, getAssetClassBreakdown, formatCurrency, formatPercent, getHoldingPnl, getHoldingPnlPercent, getHoldingValue } from "@/lib/utils";
+import { getTotalPortfolioValue, getTotalPnl, getTotalPnlPercent, getAssetClassBreakdown, formatCurrency, formatPercent, getHoldingPnl, getHoldingPnlPercent, getHoldingValue, getTotalCostBasis } from "@/lib/utils";
 import DonutChart from "./DonutChart";
 import PerformanceChart from "./PerformanceChart";
 
@@ -31,29 +31,23 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
     const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
     const [nextRefreshIn, setNextRefreshIn] = useState<number>(0);
 
-    // Calculate total group value from all holdings
+    // Calculate total group value from all holdings ONLY (no cash)
     const totalHoldingsValue = getTotalPortfolioValue(group.holdings);
-    const totalCash = group.members.reduce((sum, m) => sum + m.cashBalance, 0);
-    const totalValue = totalHoldingsValue + totalCash;
+    const totalCostBasis = getTotalCostBasis(group.holdings);
     const totalPnl = getTotalPnl(group.holdings);
     const totalPnlPercent = getTotalPnlPercent(group.holdings);
 
-    // Calculate total cost basis (what was paid for all holdings)
-    const totalCostBasis = group.holdings.reduce((sum, h) => sum + (h.avgBuyPrice * h.quantity), 0);
-
-    // Asset allocation breakdown (including cash)
+    // Asset allocation breakdown (NO cash - only actual holdings)
     const assetBreakdown = getAssetClassBreakdown(group.holdings);
 
-    // Add cash to breakdown if there is any
-    const chartData = [
-        ...Object.entries(assetBreakdown)
-            .map(([name, value]) => ({
-                name,
-                value,
-                color: ASSET_COLORS[name] || ASSET_COLORS.OTHER,
-            })),
-        ...(totalCash > 0 ? [{ name: "CASH", value: totalCash, color: ASSET_COLORS.CASH }] : [])
-    ].sort((a, b) => b.value - a.value);
+    // Chart data WITHOUT cash
+    const chartData = Object.entries(assetBreakdown)
+        .map(([name, value]) => ({
+            name,
+            value,
+            color: ASSET_COLORS[name] || ASSET_COLORS.OTHER,
+        }))
+        .sort((a, b) => b.value - a.value);
 
     // Get all unique holdings grouped by asset class
     const stockHoldings = group.holdings.filter(h => h.assetClass === "STOCK" || h.assetClass === "ETF");
@@ -239,7 +233,7 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
         );
     }
 
-    if (group.holdings.length === 0 && totalCash === 0) {
+    if (group.holdings.length === 0) {
         return (
             <div className="space-y-6">
                 <div>
@@ -298,7 +292,7 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
             )}
 
             {/* Performance Chart - Robinhood Style */}
-            <PerformanceChart currentValue={totalValue} totalCostBasis={totalCostBasis} hasHoldings={group.holdings.length > 0} />
+            <PerformanceChart currentValue={totalHoldingsValue} totalCostBasis={totalCostBasis} hasHoldings={group.holdings.length > 0} />
 
             {/* Asset Allocation - Robinhood Style */}
             <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
@@ -308,7 +302,7 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                     {/* Category List */}
                     <div className="flex-1 w-full space-y-2">
                         {chartData.map((item) => {
-                            const percentage = totalValue > 0 ? (item.value / totalValue) * 100 : 0;
+                            const percentage = totalHoldingsValue > 0 ? (item.value / totalHoldingsValue) * 100 : 0;
                             const isHighlighted = highlightedCategory === item.name;
 
                             const displayName = item.name === "STOCK" ? "Stocks" :
@@ -353,7 +347,7 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                         <DonutChart
                             data={chartData}
                             centerLabel="Total portfolio value"
-                            centerValue={formatCurrency(totalValue, 0)}
+                            centerValue={formatCurrency(totalHoldingsValue, 0)}
                             highlightedCategory={highlightedCategory}
                             onHoverCategory={setHighlightedCategory}
                             size={280}
@@ -493,9 +487,9 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                     </div>
                 </div>
                 <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-xl p-4">
-                    <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Total Cash</div>
-                    <div className="text-xl font-bold text-emerald-400">
-                        {formatCurrency(totalCash)}
+                    <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Cost Basis</div>
+                    <div className="text-xl font-bold text-slate-300">
+                        {formatCurrency(totalCostBasis)}
                     </div>
                 </div>
                 <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-xl p-4">
