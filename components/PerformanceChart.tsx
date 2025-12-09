@@ -1,110 +1,44 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-
-type TimeRange = "1D" | "1W" | "1M" | "3M" | "YTD" | "1Y" | "ALL";
 
 interface PerformanceChartProps {
     currentValue: number;
-    hasHoldings?: boolean; // If false, show flat line (no volatility)
+    totalCostBasis: number; // Sum of all avgBuyPrice * quantity
+    hasHoldings?: boolean;
     className?: string;
 }
 
-// Generate mock historical data based on current value
-function generateMockData(currentValue: number, range: TimeRange, hasHoldings: boolean) {
-    const points: { date: string; value: number; label: string }[] = [];
-    let numPoints: number;
-    let daysBetween: number;
+export default function PerformanceChart({
+    currentValue,
+    totalCostBasis,
+    hasHoldings = false,
+    className = ""
+}: PerformanceChartProps) {
+    // Calculate REAL P/L based on actual data
+    const unrealizedPnL = currentValue - totalCostBasis;
+    const pnlPercent = totalCostBasis > 0 ? (unrealizedPnL / totalCostBasis) * 100 : 0;
+    const isPositive = unrealizedPnL >= 0;
 
-    switch (range) {
-        case "1D":
-            numPoints = 24;
-            daysBetween = 0;
-            break;
-        case "1W":
-            numPoints = 7;
-            daysBetween = 1;
-            break;
-        case "1M":
-            numPoints = 30;
-            daysBetween = 1;
-            break;
-        case "3M":
-            numPoints = 12;
-            daysBetween = 7;
-            break;
-        case "YTD":
-            numPoints = 12;
-            daysBetween = 30;
-            break;
-        case "1Y":
-            numPoints = 12;
-            daysBetween = 30;
-            break;
-        case "ALL":
-            numPoints = 24;
-            daysBetween = 30;
-            break;
-        default:
-            numPoints = 30;
-            daysBetween = 1;
-    }
-
-    const now = new Date();
-    // Only add volatility if there are actual holdings (investments)
-    // If it's just cash, the line should be flat
-    const volatility = hasHoldings ? 0.02 : 0; // 2% daily volatility only for holdings
-    let value = currentValue;
-
-    // Generate backwards from current value
-    for (let i = numPoints - 1; i >= 0; i--) {
-        const date = new Date(now);
-        if (range === "1D") {
-            date.setHours(date.getHours() - i);
-        } else {
-            date.setDate(date.getDate() - (i * daysBetween));
+    // Generate simple chart data - just a line showing cost basis to current value
+    // This is honest - we show what we know: where you started and where you are
+    const data = useMemo(() => {
+        if (!hasHoldings || totalCostBasis === 0) {
+            // No holdings - just show flat line at current value (cash only)
+            return [
+                { label: "Inicio", value: currentValue },
+                { label: "Actual", value: currentValue },
+            ];
         }
 
-        // Random walk backwards - only if there are holdings
-        if (i < numPoints - 1 && hasHoldings) {
-            const change = (Math.random() - 0.48) * volatility * value; // Slight upward bias
-            value = value - change;
-        }
-
-        let label: string;
-        if (range === "1D") {
-            label = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-        } else {
-            label = date.toLocaleDateString([], { month: "short", day: "numeric" });
-        }
-
-        points.push({
-            date: date.toISOString(),
-            value: value,
-            label,
-        });
-    }
-
-    // Ensure last point is exactly current value
-    points[points.length - 1].value = currentValue;
-
-    return points;
-}
-
-export default function PerformanceChart({ currentValue, hasHoldings = false, className = "" }: PerformanceChartProps) {
-    const [selectedRange, setSelectedRange] = useState<TimeRange>("1M");
-    const [hoveredValue, setHoveredValue] = useState<number | null>(null);
-
-    const data = useMemo(() => generateMockData(currentValue, selectedRange, hasHoldings), [currentValue, selectedRange, hasHoldings]);
-
-    const startValue = data[0]?.value || 0;
-    const displayValue = hoveredValue ?? currentValue;
-    const change = displayValue - startValue;
-    const changePercent = startValue > 0 ? (change / startValue) * 100 : 0;
-    const isPositive = change >= 0;
-
-    const timeRanges: TimeRange[] = ["1D", "1W", "1M", "3M", "YTD", "1Y", "ALL"];
+        // Show trajectory from cost basis to current value
+        // This represents the actual P/L journey
+        return [
+            { label: "Inversión", value: totalCostBasis },
+            { label: "Actual", value: currentValue },
+        ];
+    }, [currentValue, totalCostBasis, hasHoldings]);
 
     const formatCurrency = (value: number) => {
         return new Intl.NumberFormat("en-US", {
@@ -116,34 +50,32 @@ export default function PerformanceChart({ currentValue, hasHoldings = false, cl
     };
 
     return (
-        <div className={`bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 ${className}`}>
+        <div className={`bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4 sm:p-6 ${className}`}>
             {/* Value Display */}
             <div className="mb-4">
-                <div className="text-4xl font-bold text-white mb-1">
-                    {formatCurrency(displayValue)}
+                <div className="text-3xl sm:text-4xl font-bold text-white mb-1">
+                    {formatCurrency(currentValue)}
                 </div>
-                <div className={`text-lg font-medium flex items-center gap-2 ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
-                    <span>{isPositive ? "▲" : "▼"}</span>
-                    <span>{formatCurrency(Math.abs(change))}</span>
-                    <span>({isPositive ? "+" : ""}{changePercent.toFixed(2)}%)</span>
-                    <span className="text-slate-500 text-sm ml-2">
-                        {selectedRange === "1D" ? "Today" : selectedRange}
-                    </span>
-                </div>
+                {hasHoldings && totalCostBasis > 0 ? (
+                    <div className={`text-base sm:text-lg font-medium flex flex-wrap items-center gap-1 sm:gap-2 ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
+                        <span>{isPositive ? "▲" : "▼"}</span>
+                        <span>{formatCurrency(Math.abs(unrealizedPnL))}</span>
+                        <span>({isPositive ? "+" : ""}{pnlPercent.toFixed(2)}%)</span>
+                        <span className="text-slate-500 text-xs sm:text-sm ml-1">
+                            P/L no realizado
+                        </span>
+                    </div>
+                ) : (
+                    <div className="text-slate-400 text-sm">
+                        Sin posiciones activas
+                    </div>
+                )}
             </div>
 
             {/* Chart */}
-            <div className="h-48 w-full">
+            <div className="h-32 sm:h-48 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                        data={data}
-                        onMouseMove={(e) => {
-                            if (e.activePayload?.[0]) {
-                                setHoveredValue(e.activePayload[0].value as number);
-                            }
-                        }}
-                        onMouseLeave={() => setHoveredValue(null)}
-                    >
+                    <AreaChart data={data}>
                         <defs>
                             <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
                                 <stop
@@ -160,7 +92,9 @@ export default function PerformanceChart({ currentValue, hasHoldings = false, cl
                         </defs>
                         <XAxis
                             dataKey="label"
-                            hide={true}
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: '#64748b', fontSize: 12 }}
                         />
                         <YAxis hide domain={["auto", "auto"]} />
                         <Tooltip
@@ -170,14 +104,14 @@ export default function PerformanceChart({ currentValue, hasHoldings = false, cl
                                 borderRadius: "8px",
                                 color: "#f1f5f9",
                             }}
-                            formatter={(value: number) => [formatCurrency(value), "Value"]}
+                            formatter={(value: number) => [formatCurrency(value), "Valor"]}
                             labelFormatter={(label) => label}
                         />
                         <Area
                             type="monotone"
                             dataKey="value"
                             stroke={isPositive ? "#00C805" : "#ef4444"}
-                            strokeWidth={2}
+                            strokeWidth={3}
                             fill="url(#colorValue)"
                             animationDuration={500}
                         />
@@ -185,21 +119,21 @@ export default function PerformanceChart({ currentValue, hasHoldings = false, cl
                 </ResponsiveContainer>
             </div>
 
-            {/* Time Range Selector */}
-            <div className="flex items-center justify-center gap-1 mt-4 bg-slate-800/50 rounded-lg p-1">
-                {timeRanges.map((range) => (
-                    <button
-                        key={range}
-                        onClick={() => setSelectedRange(range)}
-                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${selectedRange === range
-                            ? "bg-slate-700 text-white"
-                            : "text-slate-400 hover:text-slate-200"
-                            }`}
-                    >
-                        {range}
-                    </button>
-                ))}
-            </div>
+            {/* Info about the chart */}
+            {hasHoldings && totalCostBasis > 0 && (
+                <div className="mt-4 pt-4 border-t border-slate-800">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <div className="text-slate-500">Costo Base</div>
+                            <div className="text-slate-200 font-medium">{formatCurrency(totalCostBasis)}</div>
+                        </div>
+                        <div>
+                            <div className="text-slate-500">Valor Actual</div>
+                            <div className="text-slate-200 font-medium">{formatCurrency(currentValue)}</div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

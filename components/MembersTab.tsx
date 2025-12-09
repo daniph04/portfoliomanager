@@ -42,17 +42,49 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
         ? group.members.find((m) => m.id === selectedMemberId)
         : null;
 
+    // State for add investor modal
+    const [addInvestorModalOpen, setAddInvestorModalOpen] = useState(false);
+    const [newInvestorName, setNewInvestorName] = useState("");
+    const [newInvestorCash, setNewInvestorCash] = useState("");
+
+    const handleAddInvestor = () => {
+        if (!newInvestorName.trim()) return;
+        const cash = parseFloat(newInvestorCash.replace(",", ".")) || 0;
+
+        // Create new member with initial cash
+        const newMember = helpers.addMember(newInvestorName.trim());
+        if (cash > 0) {
+            helpers.depositCash(newMember.id, cash, "Capital inicial");
+        }
+
+        setNewInvestorName("");
+        setNewInvestorCash("");
+        setAddInvestorModalOpen(false);
+        onSelectMember(newMember.id);
+    };
+
     // If no member selected, show member selection grid (mobile-friendly)
     if (!selectedMember) {
         return (
             <div className="space-y-4">
-                <div>
-                    <h2 className="text-xl font-bold text-slate-100">Investors</h2>
-                    <p className="text-slate-400 text-sm mt-1">
-                        {group.members.length === 0
-                            ? "No hay inversores todavía"
-                            : "Selecciona un inversor para ver su portfolio"}
-                    </p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-100">Inversores</h2>
+                        <p className="text-slate-400 text-sm mt-1">
+                            {group.members.length === 0
+                                ? "No hay inversores todavía"
+                                : `${group.members.length} inversor${group.members.length !== 1 ? "es" : ""} en el grupo`}
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => setAddInvestorModalOpen(true)}
+                        className="p-2 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white rounded-lg transition-all flex items-center gap-2"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                        </svg>
+                        <span className="hidden sm:inline">Añadir</span>
+                    </button>
                 </div>
 
                 {group.members.length === 0 ? (
@@ -62,10 +94,16 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                             </svg>
                         </div>
-                        <h3 className="text-lg font-semibold text-slate-200 mb-2">Crea tu primer inversor</h3>
-                        <p className="text-slate-400 text-sm">
-                            Ve a la pantalla de inicio y selecciona tu perfil.
+                        <h3 className="text-lg font-semibold text-slate-200 mb-2">Añade tu primer inversor</h3>
+                        <p className="text-slate-400 text-sm mb-4">
+                            Crea perfiles de inversores para trackear sus portfolios.
                         </p>
+                        <button
+                            onClick={() => setAddInvestorModalOpen(true)}
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-colors"
+                        >
+                            Añadir inversor
+                        </button>
                     </div>
                 ) : (
                     <MemberGrid
@@ -74,6 +112,64 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                         onSelectMember={onSelectMember}
                         currentProfileId={currentProfileId}
                     />
+                )}
+
+                {/* Add Investor Modal */}
+                {addInvestorModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-black/60" onClick={() => setAddInvestorModalOpen(false)} />
+                        <div className="relative bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md">
+                            <h3 className="text-xl font-bold text-slate-100 mb-4">Añadir inversor</h3>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                                        Nombre *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={newInvestorName}
+                                        onChange={(e) => setNewInvestorName(e.target.value)}
+                                        placeholder="Ej: Juan"
+                                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                                        Capital inicial (opcional)
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                                        <input
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={newInvestorCash}
+                                            onChange={(e) => setNewInvestorCash(e.target.value)}
+                                            placeholder="10000"
+                                            className="w-full pl-8 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={() => setAddInvestorModalOpen(false)}
+                                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleAddInvestor}
+                                    disabled={!newInvestorName.trim()}
+                                    className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-slate-700 disabled:to-slate-700 text-white font-semibold rounded-xl transition-all"
+                                >
+                                    Crear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
         );

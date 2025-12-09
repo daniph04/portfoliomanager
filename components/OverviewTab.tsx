@@ -38,6 +38,9 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
     const totalPnl = getTotalPnl(group.holdings);
     const totalPnlPercent = getTotalPnlPercent(group.holdings);
 
+    // Calculate total cost basis (what was paid for all holdings)
+    const totalCostBasis = group.holdings.reduce((sum, h) => sum + (h.avgBuyPrice * h.quantity), 0);
+
     // Asset allocation breakdown (including cash)
     const assetBreakdown = getAssetClassBreakdown(group.holdings);
 
@@ -295,7 +298,7 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
             )}
 
             {/* Performance Chart - Robinhood Style */}
-            <PerformanceChart currentValue={totalValue} hasHoldings={group.holdings.length > 0} />
+            <PerformanceChart currentValue={totalValue} totalCostBasis={totalCostBasis} hasHoldings={group.holdings.length > 0} />
 
             {/* Asset Allocation - Robinhood Style */}
             <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
