@@ -17,13 +17,14 @@ export interface Holding {
     cryptoId?: string;          // CoinGecko ID for crypto (e.g. "bitcoin")
 }
 
-// Member with cash balance and realized P/L tracking
+// Member with starting capital and realized P/L tracking
 export interface Member {
     id: string;
     name: string;
     colorHue: number;           // 0-360 for HSL color generation
-    cashBalance: number;        // Available cash (increases on sell, decreases on buy)
+    cashBalance: number;        // Not used for P/L (legacy, keep for compatibility)
     totalRealizedPnl: number;   // Cumulative realized P/L from all sales
+    startingCapital?: number;   // Initial investment amount (INFO ONLY - not used for P/L)
     createdAt: string;          // ISO timestamp
 }
 

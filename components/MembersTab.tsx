@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GroupState, Holding, HoldingFormValues, Member } from "@/lib/types";
+import { GroupState, Holding, HoldingFormValues } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
 import {
     getMemberHoldings, getTotalPortfolioValue, getTotalPnl, getTotalPnlPercent,
@@ -11,6 +11,7 @@ import {
 import HoldingFormModal from "./HoldingFormModal";
 import SellConfirmModal from "./SellConfirmModal";
 import DonutChart from "./DonutChart";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 interface MembersTabProps {
     group: GroupState;
@@ -20,7 +21,6 @@ interface MembersTabProps {
     helpers: GroupDataHelpers;
 }
 
-// Asset class colors
 const ASSET_COLORS: Record<string, string> = {
     STOCK: "#00C805",
     CRYPTO: "#F7931A",
@@ -36,21 +36,10 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
     const [sellingHolding, setSellingHolding] = useState<Holding | null>(null);
     const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [addInvestorModalOpen, setAddInvestorModalOpen] = useState(false);
-    const [newInvestorName, setNewInvestorName] = useState("");
 
-    // Find selected member
     const selectedMember = selectedMemberId
         ? group.members.find((m) => m.id === selectedMemberId)
         : null;
-
-    const handleAddInvestor = () => {
-        if (!newInvestorName.trim()) return;
-        const newMember = helpers.addMember(newInvestorName.trim());
-        setNewInvestorName("");
-        setAddInvestorModalOpen(false);
-        onSelectMember(newMember.id);
-    };
 
     // Get member stats
     const memberHoldings = selectedMember ? getMemberHoldings(group.holdings, selectedMember.id) : [];
@@ -59,7 +48,7 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
     const totalPnl = getTotalPnl(memberHoldings);
     const totalPnlPercent = getTotalPnlPercent(memberHoldings);
 
-    // Asset allocation for donut chart
+    // Asset allocation
     const assetBreakdown = getAssetClassBreakdown(memberHoldings);
     const chartData = Object.entries(assetBreakdown)
         .map(([name, value]) => ({
@@ -69,7 +58,12 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
         }))
         .sort((a, b) => b.value - a.value);
 
-    // Refreshable symbols
+    // Performance chart data (cost basis to current value)
+    const performanceData = costBasis > 0 ? [
+        { name: "Inversión", value: costBasis },
+        { name: "Actual", value: totalValue },
+    ] : [];
+
     const refreshableSymbols = [...new Set(
         memberHoldings
             .filter(h => h.assetClass === "STOCK" || h.assetClass === "ETF")
@@ -138,136 +132,66 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
         }
     };
 
-    // Empty state - no members
+    // No members state
     if (group.members.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-20">
-                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-slate-800 flex items-center justify-center">
-                    <svg className="w-10 h-10 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                    </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-slate-200 mb-2">Añade tu primer inversor</h3>
-                <p className="text-slate-400 text-center max-w-md mb-4">
-                    Crea perfiles de inversores para trackear sus portfolios.
+                <div className="text-6xl mb-4">👥</div>
+                <h3 className="text-xl font-semibold text-slate-200 mb-2">No hay inversores</h3>
+                <p className="text-slate-400 text-center max-w-md">
+                    Los inversores serán configurados por el administrador.
                 </p>
-                <button
-                    onClick={() => setAddInvestorModalOpen(true)}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-colors"
-                >
-                    Añadir inversor
-                </button>
-                {renderAddInvestorModal()}
-            </div>
-        );
-    }
-
-    // Render investor sidebar item
-    function InvestorItem({ member }: { member: Member }) {
-        const holdings = getMemberHoldings(group.holdings, member.id);
-        const value = getTotalPortfolioValue(holdings);
-        const pnlPct = getTotalPnlPercent(holdings);
-        const isSelected = selectedMemberId === member.id;
-        const color = getMemberColor(member.colorHue);
-
-        return (
-            <button
-                onClick={() => onSelectMember(member.id)}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${isSelected ? "bg-slate-800" : "hover:bg-slate-800/50"
-                    }`}
-            >
-                <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-                    style={{ backgroundColor: color }}
-                >
-                    {member.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 text-left min-w-0">
-                    <div className="font-medium text-slate-100 truncate">{member.name}</div>
-                    <div className="text-sm text-slate-400">{formatCurrency(value, 0)}</div>
-                </div>
-                {holdings.length > 0 && (
-                    <div className={`text-sm font-medium ${pnlPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {formatPercent(pnlPct, 1)}
-                    </div>
-                )}
-            </button>
-        );
-    }
-
-    function renderAddInvestorModal() {
-        if (!addInvestorModalOpen) return null;
-        return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                <div className="absolute inset-0 bg-black/60" onClick={() => setAddInvestorModalOpen(false)} />
-                <div className="relative bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md">
-                    <h3 className="text-xl font-bold text-slate-100 mb-4">Añadir inversor</h3>
-                    <input
-                        type="text"
-                        value={newInvestorName}
-                        onChange={(e) => setNewInvestorName(e.target.value)}
-                        placeholder="Nombre del inversor"
-                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-4"
-                    />
-                    <div className="flex gap-3">
-                        <button
-                            onClick={() => setAddInvestorModalOpen(false)}
-                            className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl transition-colors"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            onClick={handleAddInvestor}
-                            disabled={!newInvestorName.trim()}
-                            className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white font-semibold rounded-xl transition-all"
-                        >
-                            Crear
-                        </button>
-                    </div>
-                </div>
             </div>
         );
     }
 
     return (
         <div className="flex gap-6 h-full">
-            {/* Sidebar - Desktop only */}
-            <div className="hidden lg:block w-72 flex-shrink-0">
+            {/* Sidebar - Desktop */}
+            <div className="hidden lg:block w-64 flex-shrink-0">
                 <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4 sticky top-20">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-slate-100">Inversores</h3>
-                        <button
-                            onClick={() => setAddInvestorModalOpen(true)}
-                            className="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                            </svg>
-                        </button>
-                    </div>
+                    <h3 className="text-lg font-semibold text-slate-100 mb-4">Inversores</h3>
                     <div className="space-y-1">
-                        {group.members.map((member) => (
-                            <InvestorItem key={member.id} member={member} />
-                        ))}
+                        {group.members.map((member) => {
+                            const holdings = getMemberHoldings(group.holdings, member.id);
+                            const value = getTotalPortfolioValue(holdings);
+                            const pnlPct = getTotalPnlPercent(holdings);
+                            const isSelected = selectedMemberId === member.id;
+
+                            return (
+                                <button
+                                    key={member.id}
+                                    onClick={() => onSelectMember(member.id)}
+                                    className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${isSelected ? "bg-slate-800" : "hover:bg-slate-800/50"
+                                        }`}
+                                >
+                                    <div
+                                        className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold"
+                                        style={{ backgroundColor: getMemberColor(member.colorHue) }}
+                                    >
+                                        {member.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="flex-1 text-left min-w-0">
+                                        <div className="font-medium text-slate-100 truncate">{member.name}</div>
+                                        <div className="text-sm text-slate-400">{formatCurrency(value, 0)}</div>
+                                    </div>
+                                    {holdings.length > 0 && (
+                                        <div className={`text-sm font-medium ${pnlPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                            {formatPercent(pnlPct, 1)}
+                                        </div>
+                                    )}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
 
-            {/* Main panel */}
+            {/* Main Panel */}
             <div className="flex-1 min-w-0">
-                {/* Mobile investor selector */}
+                {/* Mobile selector */}
                 <div className="lg:hidden mb-4">
-                    <div className="flex items-center justify-between mb-2">
-                        <h2 className="text-xl font-bold text-slate-100">Inversores</h2>
-                        <button
-                            onClick={() => setAddInvestorModalOpen(true)}
-                            className="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                            </svg>
-                        </button>
-                    </div>
+                    <h2 className="text-xl font-bold text-slate-100 mb-2">Inversores</h2>
                     <div className="flex gap-2 overflow-x-auto pb-2">
                         {group.members.map((member) => {
                             const isSelected = selectedMemberId === member.id;
@@ -275,8 +199,11 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                                 <button
                                     key={member.id}
                                     onClick={() => onSelectMember(member.id)}
-                                    className={`flex-shrink-0 px-4 py-2 rounded-full transition-all ${isSelected ? "bg-emerald-600 text-white" : "bg-slate-800 text-slate-300"
+                                    className={`flex-shrink-0 px-4 py-2 rounded-full transition-all ${isSelected
+                                            ? "text-white"
+                                            : "bg-slate-800 text-slate-300"
                                         }`}
+                                    style={isSelected ? { backgroundColor: getMemberColor(member.colorHue) } : {}}
                                 >
                                     {member.name}
                                 </button>
@@ -285,79 +212,115 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                     </div>
                 </div>
 
-                {/* No selection state */}
+                {/* No selection */}
                 {!selectedMember && (
                     <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-12 text-center">
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-800 flex items-center justify-center">
-                            <svg className="w-8 h-8 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
-                            </svg>
-                        </div>
+                        <div className="text-5xl mb-4">👈</div>
                         <h3 className="text-xl font-semibold text-slate-200 mb-2">Selecciona un inversor</h3>
-                        <p className="text-slate-400">
-                            Elige un inversor de la lista para ver su portfolio.
-                        </p>
+                        <p className="text-slate-400">Elige un inversor de la lista para ver su portfolio.</p>
                     </div>
                 )}
 
-                {/* Selected member view */}
+                {/* Selected member */}
                 {selectedMember && (
                     <div className="space-y-4">
                         {/* Header */}
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div
-                                    className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold text-white"
-                                    style={{ backgroundColor: getMemberColor(selectedMember.colorHue) }}
-                                >
-                                    {selectedMember.name.charAt(0).toUpperCase()}
+                        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4 md:p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div
+                                        className="w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold text-white"
+                                        style={{ backgroundColor: getMemberColor(selectedMember.colorHue) }}
+                                    >
+                                        {selectedMember.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-slate-100">{selectedMember.name}</h2>
+                                        <p className="text-slate-400 text-sm">{memberHoldings.length} posiciones</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h2 className="text-xl font-bold text-slate-100">{selectedMember.name}</h2>
-                                    <p className="text-slate-400 text-sm">{memberHoldings.length} posiciones</p>
+                                <button
+                                    onClick={handleAddHolding}
+                                    className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium rounded-lg transition-all flex items-center gap-2"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                    </svg>
+                                    <span className="hidden sm:inline">Añadir</span>
+                                </button>
+                            </div>
+
+                            {/* Stats Grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {selectedMember.startingCapital && (
+                                    <div className="bg-slate-800/50 rounded-xl p-3">
+                                        <div className="text-xs text-slate-500 uppercase">Capital Inicial</div>
+                                        <div className="text-lg font-bold text-slate-200">
+                                            {formatCurrency(selectedMember.startingCapital, 0)}
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="bg-slate-800/50 rounded-xl p-3">
+                                    <div className="text-xs text-slate-500 uppercase">Invertido</div>
+                                    <div className="text-lg font-bold text-slate-300">{formatCurrency(costBasis, 0)}</div>
+                                </div>
+                                <div className="bg-slate-800/50 rounded-xl p-3">
+                                    <div className="text-xs text-slate-500 uppercase">Valor Actual</div>
+                                    <div className="text-lg font-bold text-slate-100">{formatCurrency(totalValue, 0)}</div>
+                                </div>
+                                <div className="bg-slate-800/50 rounded-xl p-3">
+                                    <div className="text-xs text-slate-500 uppercase">P/L</div>
+                                    <div className={`text-lg font-bold ${totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                        {totalPnl >= 0 ? "+" : ""}{formatCurrency(totalPnl, 0)} ({formatPercent(totalPnlPercent, 1)})
+                                    </div>
                                 </div>
                             </div>
-                            <button
-                                onClick={handleAddHolding}
-                                className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-medium rounded-lg transition-all flex items-center gap-2"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                </svg>
-                                <span className="hidden sm:inline">Añadir</span>
-                            </button>
                         </div>
 
-                        {/* Stats */}
-                        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4">
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div>
-                                    <div className="text-xs text-slate-500 uppercase tracking-wider">Valor Total</div>
-                                    <div className="text-xl font-bold text-slate-100">{formatCurrency(totalValue)}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-slate-500 uppercase tracking-wider">Cost Basis</div>
-                                    <div className="text-xl font-bold text-slate-300">{formatCurrency(costBasis)}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-slate-500 uppercase tracking-wider">P/L</div>
-                                    <div className={`text-xl font-bold ${totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                        {formatCurrency(totalPnl)}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-slate-500 uppercase tracking-wider">Retorno</div>
-                                    <div className={`text-xl font-bold ${totalPnlPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                        {formatPercent(totalPnlPercent)}
-                                    </div>
+                        {/* Performance Chart */}
+                        {memberHoldings.length > 0 && (
+                            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4">
+                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                    <span>📈</span> Rendimiento
+                                </h3>
+                                <div className="h-32">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={performanceData}>
+                                            <XAxis
+                                                dataKey="name"
+                                                axisLine={false}
+                                                tickLine={false}
+                                                tick={{ fill: '#64748b', fontSize: 11 }}
+                                            />
+                                            <YAxis
+                                                hide
+                                                domain={['dataMin - 50', 'dataMax + 50']}
+                                            />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    backgroundColor: "#1e293b",
+                                                    border: "1px solid #334155",
+                                                    borderRadius: "8px",
+                                                }}
+                                                formatter={(value: number) => [formatCurrency(value), "Valor"]}
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="value"
+                                                stroke={totalPnl >= 0 ? "#10b981" : "#ef4444"}
+                                                strokeWidth={3}
+                                                dot={{ r: 6, fill: totalPnl >= 0 ? "#10b981" : "#ef4444" }}
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
                                 </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Asset Allocation */}
                         {memberHoldings.length > 0 && chartData.length > 0 && (
                             <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4">
-                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Allocation</h3>
+                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Distribución</h3>
                                 <div className="flex items-center gap-4">
                                     <DonutChart
                                         data={chartData}
@@ -387,7 +350,7 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                             </div>
                         )}
 
-                        {/* Refresh button */}
+                        {/* Refresh Button */}
                         {refreshableSymbols.length > 0 && (
                             <button
                                 onClick={handleRefreshPrices}
@@ -403,9 +366,10 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
 
                         {/* Holdings */}
                         <div>
-                            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Holdings</h3>
+                            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Posiciones</h3>
                             {memberHoldings.length === 0 ? (
                                 <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 text-center">
+                                    <div className="text-4xl mb-3">📋</div>
                                     <p className="text-slate-400 mb-4">Sin posiciones abiertas</p>
                                     <button
                                         onClick={handleAddHolding}
@@ -468,8 +432,6 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
             </div>
 
             {/* Modals */}
-            {renderAddInvestorModal()}
-
             {selectedMember && (
                 <>
                     <HoldingFormModal
@@ -483,7 +445,7 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                             avgBuyPrice: editingHolding.avgBuyPrice,
                             currentPrice: editingHolding.currentPrice,
                         } : undefined}
-                        availableCash={999999} // No cash limit since we removed cash
+                        availableCash={999999}
                         onClose={() => setModalOpen(false)}
                         onSubmit={handleFormSubmit}
                     />
