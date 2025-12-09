@@ -216,8 +216,7 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                                 <tr className="bg-slate-800/50 border-b border-slate-700">
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Rank</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Inversor</th>
-                                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Capital Inicial</th>
-                                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Invertido</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Cost Basis</th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Valor Actual</th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">P/L</th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Retorno</th>
@@ -251,9 +250,6 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                                                         <div className="text-xs text-slate-500">{entry.holdingCount} posiciones</div>
                                                     </div>
                                                 </div>
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-slate-400">
-                                                {entry.member.startingCapital ? formatCurrency(entry.member.startingCapital, 0) : "-"}
                                             </td>
                                             <td className="px-4 py-3 text-right text-slate-300">
                                                 {formatCurrency(entry.costBasis, 0)}
