@@ -1,8 +1,7 @@
 "use client";
 
-// Empty providers - the app uses usePersistentGroupData directly in each page
-// No global context needed since localStorage is shared
+import { UserProvider } from "@/lib/hooks/useUser";
 
 export function Providers({ children }: { children: React.ReactNode }) {
-    return <>{children}</>;
+    return <UserProvider>{children}</UserProvider>;
 }
