@@ -61,7 +61,7 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-950">
+        <div className="min-h-screen bg-slate-950 pb-20">
             {/* Background gradients */}
             <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950" />
             <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-900/10 via-transparent to-transparent" />
@@ -75,43 +75,27 @@ export default function DashboardPage() {
                     currentProfileName={currentProfile?.name}
                 />
 
-                <div className="flex flex-1 overflow-hidden">
-                    {/* Sidebar - only show on members tab */}
+                {/* Main content - full width on mobile */}
+                <main className="flex-1 overflow-y-auto p-4">
+                    {currentTab === "overview" && (
+                        <OverviewTab group={group} helpers={helpers} />
+                    )}
+                    {currentTab === "leaderboard" && (
+                        <LeaderboardTab group={group} />
+                    )}
                     {currentTab === "members" && (
-                        <Sidebar
+                        <MembersTab
                             group={group}
-                            members={group.members}
                             selectedMemberId={selectedMemberId}
                             currentProfileId={currentProfileId}
                             onSelectMember={setSelectedMemberId}
-                            searchQuery={memberSearchQuery}
-                            onSearchChange={setMemberSearchQuery}
-                            onAddMember={helpers.addMember}
+                            helpers={helpers}
                         />
                     )}
-
-                    {/* Main content */}
-                    <main className={`flex-1 overflow-y-auto p-6 ${currentTab === "members" ? "" : "max-w-7xl mx-auto w-full"}`}>
-                        {currentTab === "overview" && (
-                            <OverviewTab group={group} helpers={helpers} />
-                        )}
-                        {currentTab === "leaderboard" && (
-                            <LeaderboardTab group={group} />
-                        )}
-                        {currentTab === "members" && (
-                            <MembersTab
-                                group={group}
-                                selectedMemberId={selectedMemberId}
-                                currentProfileId={currentProfileId}
-                                onSelectMember={setSelectedMemberId}
-                                helpers={helpers}
-                            />
-                        )}
-                        {currentTab === "activity" && (
-                            <ActivityTab group={group} />
-                        )}
-                    </main>
-                </div>
+                    {currentTab === "activity" && (
+                        <ActivityTab group={group} />
+                    )}
+                </main>
             </div>
         </div>
     );

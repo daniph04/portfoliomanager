@@ -110,6 +110,15 @@ export default function HoldingFormModal({ open, mode, initialValues, availableC
         }
     };
 
+    // Parse number that may use comma or period as decimal separator
+    const parseLocaleNumber = (value: string): number => {
+        if (!value) return 0;
+        // Replace comma with period for parsing
+        const normalized = value.replace(",", ".");
+        const parsed = parseFloat(normalized);
+        return isNaN(parsed) ? 0 : parsed;
+    };
+
     // Handle symbol selection from search
     const handleSymbolSelect = (result: { symbol: string; name: string; assetClass: AssetClass; currentPrice: number }) => {
         setFormData(prev => ({
@@ -233,11 +242,11 @@ export default function HoldingFormModal({ open, mode, initialValues, availableC
                         </label>
                         <input
                             id="quantity"
-                            type="number"
-                            step="any"
+                            type="text"
+                            inputMode="decimal"
                             value={formData.quantity || ""}
-                            onChange={(e) => handleChange("quantity", parseFloat(e.target.value) || 0)}
-                            placeholder="10"
+                            onChange={(e) => handleChange("quantity", parseLocaleNumber(e.target.value))}
+                            placeholder="10 (usa . o , para decimales)"
                             className={`w-full px-3 py-2.5 bg-slate-800 border ${errors.quantity ? "border-red-500" : "border-slate-700"
                                 } rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent`}
                         />
@@ -247,24 +256,24 @@ export default function HoldingFormModal({ open, mode, initialValues, availableC
                     {/* Average Buy Price */}
                     <div>
                         <label htmlFor="avgBuyPrice" className="block text-sm font-medium text-slate-300 mb-1">
-                            Your Average Buy Price *
+                            Tu precio promedio de compra *
                         </label>
                         <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
                             <input
                                 id="avgBuyPrice"
-                                type="number"
-                                step="0.01"
+                                type="text"
+                                inputMode="decimal"
                                 value={formData.avgBuyPrice || ""}
-                                onChange={(e) => handleChange("avgBuyPrice", parseFloat(e.target.value) || 0)}
-                                placeholder="150.00"
+                                onChange={(e) => handleChange("avgBuyPrice", parseLocaleNumber(e.target.value))}
+                                placeholder="150.00 (usa . o ,)"
                                 className={`w-full pl-8 pr-3 py-2.5 bg-slate-800 border ${errors.avgBuyPrice ? "border-red-500" : "border-slate-700"
                                     } rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent`}
                             />
                         </div>
                         {errors.avgBuyPrice && <p className="text-red-400 text-xs mt-1">{errors.avgBuyPrice}</p>}
                         <p className="text-xs text-slate-500 mt-1">
-                            The price you paid per share/unit
+                            El precio que pagaste por acción/unidad
                         </p>
                     </div>
 

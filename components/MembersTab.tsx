@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GroupState, Holding, HoldingFormValues } from "@/lib/types";
+import { GroupState, Holding, HoldingFormValues, Member } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
 import {
     getMemberHoldings, getTotalPortfolioValue, getTotalPnl, getTotalPnlPercent,
@@ -42,42 +42,39 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
         ? group.members.find((m) => m.id === selectedMemberId)
         : null;
 
-    // No member selected state
+    // If no member selected, show member selection grid (mobile-friendly)
     if (!selectedMember) {
         return (
-            <div className="space-y-6">
+            <div className="space-y-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-100">Investor Portfolio</h2>
-                    <p className="text-slate-400 mt-1">View and manage individual holdings</p>
+                    <h2 className="text-xl font-bold text-slate-100">Investors</h2>
+                    <p className="text-slate-400 text-sm mt-1">
+                        {group.members.length === 0
+                            ? "No hay inversores todavía"
+                            : "Selecciona un inversor para ver su portfolio"}
+                    </p>
                 </div>
 
-                <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-12 text-center">
-                    {group.members.length === 0 ? (
-                        <>
-                            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-slate-800 flex items-center justify-center">
-                                <svg className="w-10 h-10 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                                </svg>
-                            </div>
-                            <h3 className="text-xl font-semibold text-slate-200 mb-2">Create your first investor</h3>
-                            <p className="text-slate-400 max-w-md mx-auto">
-                                Use the sidebar on the left to add an investor, then start tracking their holdings.
-                            </p>
-                        </>
-                    ) : (
-                        <>
-                            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-slate-800 flex items-center justify-center">
-                                <svg className="w-10 h-10 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
-                                </svg>
-                            </div>
-                            <h3 className="text-xl font-semibold text-slate-200 mb-2">Select an investor</h3>
-                            <p className="text-slate-400 max-w-md mx-auto">
-                                Choose an investor from the sidebar to view and manage their portfolio.
-                            </p>
-                        </>
-                    )}
-                </div>
+                {group.members.length === 0 ? (
+                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 text-center">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-800 flex items-center justify-center">
+                            <svg className="w-8 h-8 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-lg font-semibold text-slate-200 mb-2">Crea tu primer inversor</h3>
+                        <p className="text-slate-400 text-sm">
+                            Ve a la pantalla de inicio y selecciona tu perfil.
+                        </p>
+                    </div>
+                ) : (
+                    <MemberGrid
+                        members={group.members}
+                        holdings={group.holdings}
+                        onSelectMember={onSelectMember}
+                        currentProfileId={currentProfileId}
+                    />
+                )}
             </div>
         );
     }
@@ -170,249 +167,215 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
         }
     };
 
+    const handleBackToList = () => {
+        onSelectMember("");
+    };
+
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-100">Investor Portfolio</h2>
-                    <p className="text-slate-400 mt-1">View and manage individual holdings</p>
+        <div className="space-y-4">
+            {/* Header with Back Button */}
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={handleBackToList}
+                    className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+                <div className="flex-1 min-w-0">
+                    <h2 className="text-lg font-bold text-slate-100 truncate">{selectedMember.name}</h2>
+                    <p className="text-slate-400 text-sm">{memberHoldings.length} holding{memberHoldings.length !== 1 ? "s" : ""}</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    {refreshableSymbols.length > 0 && (
-                        <button
-                            onClick={handleRefreshPrices}
-                            disabled={isRefreshing}
-                            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-800 text-slate-300 hover:text-white disabled:text-slate-500 rounded-lg transition-all flex items-center gap-2 text-sm"
-                        >
-                            <svg
-                                className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            {isRefreshing ? "..." : "Refresh"}
-                        </button>
-                    )}
-                    <button
-                        onClick={handleAddHolding}
-                        className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-medium rounded-lg transition-all transform hover:scale-105 flex items-center gap-2"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                        Add Holding
-                    </button>
-                </div>
+                <button
+                    onClick={handleAddHolding}
+                    className="p-2 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white rounded-lg transition-all"
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                </button>
             </div>
 
-            {/* Member Summary Card */}
-            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-                <div className="flex items-center gap-4 mb-6">
+            {/* Summary Card - Mobile optimized */}
+            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4">
+                <div className="flex items-center gap-3 mb-4">
                     <div
-                        className="w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold text-white"
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold text-white flex-shrink-0"
                         style={{ backgroundColor: memberColor }}
                     >
                         {selectedMember.name.charAt(0).toUpperCase()}
                     </div>
-                    <div>
-                        <h3 className="text-xl font-bold text-slate-100">{selectedMember.name}</h3>
-                        <p className="text-slate-400">{memberHoldings.length} holding{memberHoldings.length !== 1 ? "s" : ""}</p>
+                    <div className="flex-1 min-w-0">
+                        <div className="text-2xl font-bold text-slate-100">{formatCurrency(totalValue + selectedMember.cashBalance)}</div>
+                        <div className="text-sm text-slate-400">Total Value</div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-6">
-                    <div>
-                        <div className="text-sm text-slate-400 mb-1">Holdings Value</div>
-                        <div className="text-2xl font-bold text-slate-100">{formatCurrency(totalValue)}</div>
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-slate-800/50 rounded-xl p-3">
+                        <div className="text-xs text-slate-500">Holdings</div>
+                        <div className="text-lg font-bold text-slate-100">{formatCurrency(totalValue)}</div>
                     </div>
-                    <div>
-                        <div className="text-sm text-slate-400 mb-1">Cash Balance</div>
-                        <div className="text-2xl font-bold text-emerald-400">{formatCurrency(selectedMember.cashBalance)}</div>
+                    <div className="bg-slate-800/50 rounded-xl p-3">
+                        <div className="text-xs text-slate-500">Cash</div>
+                        <div className="text-lg font-bold text-emerald-400">{formatCurrency(selectedMember.cashBalance)}</div>
                     </div>
-                    <div>
-                        <div className="text-sm text-slate-400 mb-1">Total Value</div>
-                        <div className="text-2xl font-bold text-slate-100">{formatCurrency(totalValue + selectedMember.cashBalance)}</div>
-                    </div>
-                    <div>
-                        <div className="text-sm text-slate-400 mb-1">Unrealized P/L</div>
-                        <div className={`text-2xl font-bold ${totalPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                            {formatCurrency(totalPnl)}
+                    <div className="bg-slate-800/50 rounded-xl p-3">
+                        <div className="text-xs text-slate-500">Unrealized P/L</div>
+                        <div className={`text-lg font-bold ${totalPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                            {totalPnl >= 0 ? "+" : ""}{formatCurrency(totalPnl)}
                         </div>
                     </div>
-                    <div>
-                        <div className="text-sm text-slate-400 mb-1">Realized P/L</div>
-                        <div className={`text-2xl font-bold ${selectedMember.totalRealizedPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                            {formatCurrency(selectedMember.totalRealizedPnl)}
+                    <div className="bg-slate-800/50 rounded-xl p-3">
+                        <div className="text-xs text-slate-500">Return %</div>
+                        <div className={`text-lg font-bold ${totalPnlPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                            {formatPercent(totalPnlPercent)}
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Asset Allocation - Robinhood Style */}
-            {memberHoldings.length > 0 && (
-                <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-                    <h3 className="text-lg font-semibold text-slate-100 mb-6">Asset Allocation</h3>
-
-                    <div className="flex flex-col lg:flex-row items-center gap-8">
-                        {/* Category List */}
-                        <div className="flex-1 w-full space-y-2">
+            {/* Asset Allocation - Compact for mobile */}
+            {memberHoldings.length > 0 && chartData.length > 0 && (
+                <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4">
+                    <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Allocation</h3>
+                    <div className="flex items-center gap-4">
+                        <DonutChart
+                            data={chartData}
+                            centerLabel=""
+                            centerValue={formatCurrency(totalValue, 0)}
+                            highlightedCategory={highlightedCategory}
+                            onHoverCategory={setHighlightedCategory}
+                            size={100}
+                        />
+                        <div className="flex-1 space-y-2">
                             {chartData.map((item) => {
                                 const percentage = totalValue > 0 ? (item.value / totalValue) * 100 : 0;
-                                const isHighlighted = highlightedCategory === item.name;
-
                                 return (
-                                    <button
-                                        key={item.name}
-                                        onMouseEnter={() => setHighlightedCategory(item.name)}
-                                        onMouseLeave={() => setHighlightedCategory(null)}
-                                        className={`w-full flex items-center justify-between p-4 rounded-xl transition-all duration-200 ${isHighlighted
-                                            ? "bg-slate-800 scale-[1.02]"
-                                            : "hover:bg-slate-800/50"
-                                            }`}
-                                    >
-                                        <div className="flex items-center gap-3">
+                                    <div key={item.name} className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
                                             <div
-                                                className="w-4 h-4 rounded-full"
+                                                className="w-3 h-3 rounded-full"
                                                 style={{ backgroundColor: item.color }}
                                             />
-                                            <span className="font-medium text-slate-200">
+                                            <span className="text-sm text-slate-300">
                                                 {item.name === "STOCK" ? "Stocks" :
                                                     item.name === "CRYPTO" ? "Crypto" :
                                                         item.name === "ETF" ? "ETFs" : "Other"}
                                             </span>
                                         </div>
-                                        <div className="text-right">
-                                            <div className="text-slate-400 text-sm">{percentage.toFixed(1)}%</div>
-                                            <div className="font-medium text-slate-200">{formatCurrency(item.value)}</div>
-                                        </div>
-                                    </button>
+                                        <span className="text-sm text-slate-400">{percentage.toFixed(0)}%</span>
+                                    </div>
                                 );
                             })}
-                        </div>
-
-                        {/* Donut Chart */}
-                        <div className="flex-shrink-0">
-                            <DonutChart
-                                data={chartData}
-                                centerLabel="Total portfolio value"
-                                centerValue={formatCurrency(totalValue, 0)}
-                                highlightedCategory={highlightedCategory}
-                                onHoverCategory={setHighlightedCategory}
-                                size={240}
-                            />
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Holdings Table */}
-            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-800">
-                    <h3 className="text-lg font-semibold text-slate-100">Holdings</h3>
-                </div>
+            {/* Refresh button */}
+            {refreshableSymbols.length > 0 && (
+                <button
+                    onClick={handleRefreshPrices}
+                    disabled={isRefreshing}
+                    className="w-full py-3 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-800 text-slate-300 hover:text-white disabled:text-slate-500 rounded-xl transition-all flex items-center justify-center gap-2 text-sm font-medium"
+                >
+                    <svg
+                        className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    {isRefreshing ? "Actualizando..." : "Actualizar precios"}
+                </button>
+            )}
+
+            {/* Holdings List - Mobile cards instead of table */}
+            <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Holdings</h3>
 
                 {memberHoldings.length === 0 ? (
-                    <div className="p-12 text-center">
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-800 flex items-center justify-center">
-                            <svg className="w-8 h-8 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 text-center">
+                        <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-slate-800 flex items-center justify-center">
+                            <svg className="w-7 h-7 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
-                        <div className="text-slate-400 text-lg mb-2">No holdings yet</div>
-                        <div className="text-slate-500 text-sm mb-4">
-                            Add this investor&apos;s first position to start tracking their portfolio
-                        </div>
+                        <div className="text-slate-400 mb-2">Sin holdings todavía</div>
                         <button
                             onClick={handleAddHolding}
                             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-colors"
                         >
-                            Add First Holding
+                            Añadir Holding
                         </button>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="bg-slate-800/50 border-b border-slate-700">
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Asset</th>
-                                    <th className="px-6 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Shares</th>
-                                    <th className="px-6 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Price</th>
-                                    <th className="px-6 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Avg Cost</th>
-                                    <th className="px-6 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Return</th>
-                                    <th className="px-6 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Equity</th>
-                                    <th className="px-6 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800">
-                                {memberHoldings.map((holding) => {
-                                    const pnl = getHoldingPnl(holding);
-                                    const pnlPercent = getHoldingPnlPercent(holding);
-                                    const equity = getHoldingValue(holding);
+                    <div className="space-y-2">
+                        {memberHoldings.map((holding) => {
+                            const pnl = getHoldingPnl(holding);
+                            const pnlPercent = getHoldingPnlPercent(holding);
+                            const equity = getHoldingValue(holding);
 
-                                    return (
-                                        <tr key={holding.id} className="hover:bg-slate-800/30 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div
-                                                        className="w-2 h-8 rounded-full"
-                                                        style={{ backgroundColor: ASSET_COLORS[holding.assetClass] || ASSET_COLORS.OTHER }}
-                                                    />
-                                                    <div>
-                                                        <div className="font-semibold text-slate-100">{holding.symbol}</div>
-                                                        <div className="text-sm text-slate-400">{holding.name}</div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-right text-slate-300">
-                                                {holding.quantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                                            </td>
-                                            <td className="px-6 py-4 text-right text-slate-300">
-                                                {formatCurrency(holding.currentPrice)}
-                                            </td>
-                                            <td className="px-6 py-4 text-right text-slate-300">
-                                                {formatCurrency(holding.avgBuyPrice)}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className={`font-medium ${pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                                    {pnl >= 0 ? "▲" : "▼"} {formatCurrency(Math.abs(pnl))}
-                                                </div>
-                                                <div className={`text-sm ${pnlPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                                    {formatPercent(pnlPercent)}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-medium text-slate-100">
-                                                {formatCurrency(equity)}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => handleEditHolding(holding)}
-                                                        className="p-2 text-slate-400 hover:text-cyan-400 hover:bg-slate-800 rounded-lg transition-colors"
-                                                        title="Edit"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                        </svg>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleSellHolding(holding)}
-                                                        className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors"
-                                                        title="Sell"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                        </svg>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                            return (
+                                <div
+                                    key={holding.id}
+                                    className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-xl p-4"
+                                >
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div
+                                                className="w-1.5 h-10 rounded-full"
+                                                style={{ backgroundColor: ASSET_COLORS[holding.assetClass] || ASSET_COLORS.OTHER }}
+                                            />
+                                            <div>
+                                                <div className="font-semibold text-slate-100">{holding.symbol}</div>
+                                                <div className="text-xs text-slate-400">{holding.name}</div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="font-bold text-slate-100">{formatCurrency(equity)}</div>
+                                            <div className={`text-sm font-medium ${pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                                {pnl >= 0 ? "+" : ""}{formatCurrency(pnl)} ({formatPercent(pnlPercent)})
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-sm">
+                                        <div>
+                                            <span className="text-slate-500">Qty: </span>
+                                            <span className="text-slate-300">{holding.quantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500">Price: </span>
+                                            <span className="text-slate-300">{formatCurrency(holding.currentPrice)}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500">Avg: </span>
+                                            <span className="text-slate-300">{formatCurrency(holding.avgBuyPrice)}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-700/50">
+                                        <button
+                                            onClick={() => handleEditHolding(holding)}
+                                            className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors text-sm font-medium"
+                                        >
+                                            Editar
+                                        </button>
+                                        <button
+                                            onClick={() => handleSellHolding(holding)}
+                                            className="flex-1 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors text-sm font-medium"
+                                        >
+                                            Vender
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -443,6 +406,65 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                 }}
                 onConfirm={handleConfirmSell}
             />
+        </div>
+    );
+}
+
+// Member Grid Component for mobile
+function MemberGrid({
+    members,
+    holdings,
+    onSelectMember,
+    currentProfileId
+}: {
+    members: Member[];
+    holdings: Holding[];
+    onSelectMember: (id: string) => void;
+    currentProfileId: string | null;
+}) {
+    return (
+        <div className="grid grid-cols-2 gap-3">
+            {members.map((member) => {
+                const memberHoldings = getMemberHoldings(holdings, member.id);
+                const portfolioValue = getTotalPortfolioValue(memberHoldings);
+                const pnlPercent = getTotalPnlPercent(memberHoldings);
+                const memberColor = getMemberColor(member.colorHue);
+                const isCurrentUser = member.id === currentProfileId;
+
+                return (
+                    <button
+                        key={member.id}
+                        onClick={() => onSelectMember(member.id)}
+                        className={`bg-slate-900/50 backdrop-blur-xl border rounded-2xl p-4 text-left transition-all hover:scale-[1.02] ${isCurrentUser ? "border-emerald-500/50" : "border-slate-800"
+                            }`}
+                    >
+                        <div className="flex items-center gap-3 mb-3">
+                            <div
+                                className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                                style={{ backgroundColor: memberColor }}
+                            >
+                                {member.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                                <div className="font-medium text-slate-100 truncate">{member.name}</div>
+                                {isCurrentUser && (
+                                    <div className="text-xs text-emerald-400">Tú</div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="text-lg font-bold text-slate-100">
+                            {formatCurrency(portfolioValue + member.cashBalance, 0)}
+                        </div>
+                        {memberHoldings.length > 0 ? (
+                            <div className={`text-sm font-medium ${pnlPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {formatPercent(pnlPercent)}
+                            </div>
+                        ) : (
+                            <div className="text-sm text-slate-500">Sin holdings</div>
+                        )}
+                    </button>
+                );
+            })}
         </div>
     );
 }
