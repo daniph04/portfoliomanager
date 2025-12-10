@@ -262,8 +262,8 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                 {/* Selected member */}
                 {selectedMember && (
                     <div className="space-y-4">
-                        {/* Cash Balance Card - Premium Design */}
-                        {currentProfileId === selectedMember.id && (
+                        {/* Cash Balance Card - Premium Design - Only for current user and not read-only*/}
+                        {!readOnly && currentProfileId === selectedMember.id && (
                             <div className="relative overflow-hidden bg-gradient-to-br from-emerald-900/40 via-slate-900/80 to-cyan-900/40 backdrop-blur-xl border border-emerald-500/20 rounded-2xl p-5">
                                 {/* Decorative elements */}
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl" />
@@ -319,15 +319,17 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                                         <p className="text-slate-400 text-sm">{memberHoldings.length} positions</p>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={handleAddHolding}
-                                    className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium rounded-lg transition-all flex items-center gap-2"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                    </svg>
-                                    <span className="hidden sm:inline">Add</span>
-                                </button>
+                                {!readOnly && (
+                                    <button
+                                        onClick={handleAddHolding}
+                                        className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium rounded-lg transition-all flex items-center gap-2"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                        </svg>
+                                        <span className="hidden sm:inline">Add</span>
+                                    </button>
+                                )}
                             </div>
 
                             {/* Stats Grid */}
@@ -489,20 +491,22 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                                                     <span>Price: {formatCurrency(holding.currentPrice)}</span>
                                                     <span>Avg: {formatCurrency(holding.avgBuyPrice)}</span>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => handleEditHolding(holding)}
-                                                        className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors text-sm font-medium"
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleSellHolding(holding)}
-                                                        className="flex-1 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors text-sm font-medium"
-                                                    >
-                                                        Sell
-                                                    </button>
-                                                </div>
+                                                {!readOnly && (
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => handleEditHolding(holding)}
+                                                            className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors text-sm font-medium"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleSellHolding(holding)}
+                                                            className="flex-1 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors text-sm font-medium"
+                                                        >
+                                                            Sell
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })}
