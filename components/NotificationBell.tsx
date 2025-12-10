@@ -1,13 +1,16 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { requestPushPermission, onForegroundMessage, saveFcmToken } from "@/lib/firebase";
+import { requestPushPermission, onForegroundMessage, saveFcmToken, getMessagingInstance, VAPID_KEY } from "@/lib/firebase";
+import { getToken } from "firebase/messaging";
 import { useUser } from "@/lib/hooks/useUser";
 
 export default function NotificationBell() {
     const { currentUser, currentGroup } = useUser();
     const [status, setStatus] = useState<"idle" | "loading" | "enabled" | "denied" | "unsupported">("idle");
     const [showPopup, setShowPopup] = useState(false);
+    const [isTesting, setIsTesting] = useState(false);
+    const [testResult, setTestResult] = useState<"success" | "error" | null>(null);
     const popupRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -31,6 +34,7 @@ export default function NotificationBell() {
         const handleClickOutside = (event: MouseEvent) => {
             if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
                 setShowPopup(false);
+                setTestResult(null);
             }
         };
 
@@ -72,14 +76,43 @@ export default function NotificationBell() {
             await saveFcmToken(token, currentUser.id, currentGroup.id);
             setStatus("enabled");
             await setupListeners();
-            setShowPopup(false);
         } catch (err) {
             console.error('Error enabling push:', err);
             setStatus("idle");
         }
     };
 
-    // Hide completely if unsupported
+    const handleTestNotification = async () => {
+        setIsTesting(true);
+        setTestResult(null);
+
+        try {
+            const messagingInstance = await getMessagingInstance();
+            if (!messagingInstance) {
+                throw new Error("Messaging not available");
+            }
+
+            const token = await getToken(messagingInstance, { vapidKey: VAPID_KEY });
+
+            const response = await fetch('/api/test-notification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token }),
+            });
+
+            if (response.ok) {
+                setTestResult("success");
+            } else {
+                setTestResult("error");
+            }
+        } catch (err) {
+            console.error('Test notification error:', err);
+            setTestResult("error");
+        } finally {
+            setIsTesting(false);
+        }
+    };
+
     if (status === "unsupported") return null;
 
     return (
@@ -93,14 +126,12 @@ export default function NotificationBell() {
                         : "text-slate-400 hover:text-white hover:bg-slate-800"
                     }`}
             >
-                {/* Bell icon */}
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                     />
                 </svg>
 
-                {/* Status indicator dot */}
                 {status === "enabled" && (
                     <span className="absolute top-1 right-1 w-2 h-2 bg-emerald-400 rounded-full" />
                 )}
@@ -112,11 +143,9 @@ export default function NotificationBell() {
                 )}
             </button>
 
-            {/* Popup */}
             {showPopup && (
                 <div className="absolute top-full right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50">
                     <div className="p-4">
-                        {/* Header */}
                         <div className="flex items-center gap-3 mb-3">
                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center">
                                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -133,7 +162,6 @@ export default function NotificationBell() {
                             </div>
                         </div>
 
-                        {/* Content based on status */}
                         {status === "enabled" ? (
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2 text-emerald-400 text-sm">
@@ -143,8 +171,33 @@ export default function NotificationBell() {
                                     <span>Notifications enabled!</span>
                                 </div>
                                 <p className="text-xs text-slate-400">
-                                    You&apos;ll receive alerts when other group members buy, sell, or make changes to their portfolios.
+                                    You&apos;ll receive alerts when other group members buy, sell, or join.
                                 </p>
+
+                                <button
+                                    onClick={handleTestNotification}
+                                    disabled={isTesting}
+                                    className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {isTesting ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-slate-500 border-t-white rounded-full animate-spin" />
+                                            Sending...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span>🧪</span>
+                                            Send Test Notification
+                                        </>
+                                    )}
+                                </button>
+
+                                {testResult === "success" && (
+                                    <p className="text-xs text-emerald-400 text-center">✓ Check your notifications!</p>
+                                )}
+                                {testResult === "error" && (
+                                    <p className="text-xs text-red-400 text-center">Failed to send. Try again.</p>
+                                )}
                             </div>
                         ) : status === "denied" ? (
                             <div className="space-y-3">
