@@ -44,7 +44,7 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
 
         for (let i = 0; i < numPoints; i++) {
             const progress = i / (numPoints - 1);
-            const label = i === 0 ? "Inicio" : i === numPoints - 1 ? "Hoy" : ``;
+            const label = i === 0 ? "Start" : i === numPoints - 1 ? "Today" : ``;
 
             const point: Record<string, number | string> = { name: label };
 
@@ -79,9 +79,9 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
         return (
             <div className="flex flex-col items-center justify-center py-20">
                 <div className="text-6xl mb-4">🏆</div>
-                <h3 className="text-xl font-semibold text-slate-200 mb-2">No hay inversores</h3>
+                <h3 className="text-xl font-semibold text-slate-200 mb-2">No investors</h3>
                 <p className="text-slate-400 text-center max-w-md">
-                    El ranking aparecerá cuando haya inversores con posiciones.
+                    The ranking will appear when there are investors with positions.
                 </p>
             </div>
         );
@@ -96,25 +96,25 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                         <span className="text-4xl">🏆</span>
                         <div>
                             <h2 className="text-2xl font-bold text-slate-100">Ranking</h2>
-                            <p className="text-slate-400">{group.members.length} inversores</p>
+                            <p className="text-slate-400">{group.members.length} investors</p>
                         </div>
                     </div>
                     <div className="grid grid-cols-3 gap-6 text-center">
                         <div>
                             <div className="text-xl md:text-2xl font-bold text-slate-100">{formatCurrency(totalGroupValue, 0)}</div>
-                            <div className="text-xs text-slate-500 uppercase">Valor Total</div>
+                            <div className="text-xs text-slate-500 uppercase">Total Value</div>
                         </div>
                         <div>
                             <div className={`text-xl md:text-2xl font-bold ${totalGroupPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                                 {totalGroupPnl >= 0 ? "+" : ""}{formatCurrency(totalGroupPnl, 0)}
                             </div>
-                            <div className="text-xs text-slate-500 uppercase">P/L Grupo</div>
+                            <div className="text-xs text-slate-500 uppercase">Group P/L</div>
                         </div>
                         <div>
                             <div className={`text-xl md:text-2xl font-bold ${avgReturn >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                                 {formatPercent(avgReturn, 1)}
                             </div>
-                            <div className="text-xs text-slate-500 uppercase">Media</div>
+                            <div className="text-xs text-slate-500 uppercase">Average</div>
                         </div>
                     </div>
                 </div>
@@ -124,7 +124,7 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
             {hasAnyHoldings && rankings.length > 0 && (
                 <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4 md:p-6">
                     <h3 className="text-lg font-semibold text-slate-100 mb-4 flex items-center gap-2">
-                        <span>🏁</span> Carrera de Rendimiento
+                        <span>🏁</span> Performance Race
                     </h3>
                     <div className="h-48 md:h-64">
                         <ResponsiveContainer width="100%" height="100%">
@@ -234,8 +234,8 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
             {hasAnyHoldings && rankings.length > 0 && (
                 <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl overflow-hidden">
                     <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-                        <h3 className="font-semibold text-slate-100">Ranking Completo</h3>
-                        <span className="text-xs text-slate-500">Ordenado por % retorno</span>
+                        <h3 className="font-semibold text-slate-100">Full Ranking</h3>
+                        <span className="text-xs text-slate-500">Sorted by % return</span>
                     </div>
 
                     {/* Desktop Table */}
@@ -244,11 +244,11 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                             <thead>
                                 <tr className="bg-slate-800/50 border-b border-slate-700">
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Rank</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Inversor</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Investor</th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Cost Basis</th>
-                                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Valor Actual</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Current Value</th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">P/L</th>
-                                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Retorno</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Return</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800">
@@ -276,7 +276,7 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                                                     </div>
                                                     <div>
                                                         <div className="font-medium text-slate-100">{entry.member.name}</div>
-                                                        <div className="text-xs text-slate-500">{entry.holdingCount} posiciones</div>
+                                                        <div className="text-xs text-slate-500">{entry.holdingCount} positions</div>
                                                     </div>
                                                 </div>
                                             </td>
@@ -325,7 +325,7 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                                         </div>
                                         <div className="flex-1">
                                             <div className="font-medium text-slate-100">{entry.member.name}</div>
-                                            <div className="text-xs text-slate-500">{entry.holdingCount} posiciones</div>
+                                            <div className="text-xs text-slate-500">{entry.holdingCount} positions</div>
                                         </div>
                                         <div className="text-right">
                                             <div className={`text-lg font-bold ${entry.pnlPercent >= 0 ? "text-emerald-400" : "text-red-400"}`}>
@@ -335,11 +335,11 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                                     </div>
                                     <div className="grid grid-cols-3 gap-2 text-xs">
                                         <div className="bg-slate-800/50 rounded-lg p-2 text-center">
-                                            <div className="text-slate-500">Invertido</div>
+                                            <div className="text-slate-500">Invested</div>
                                             <div className="text-slate-200 font-medium">{formatCurrency(entry.costBasis, 0)}</div>
                                         </div>
                                         <div className="bg-slate-800/50 rounded-lg p-2 text-center">
-                                            <div className="text-slate-500">Valor</div>
+                                            <div className="text-slate-500">Value</div>
                                             <div className="text-slate-200 font-medium">{formatCurrency(entry.totalValue, 0)}</div>
                                         </div>
                                         <div className="bg-slate-800/50 rounded-lg p-2 text-center">
@@ -363,7 +363,7 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                     <div className="bg-slate-900/50 backdrop-blur-xl border border-emerald-500/30 rounded-2xl overflow-hidden">
                         <div className="px-4 py-3 border-b border-slate-800 bg-emerald-500/5">
                             <h3 className="font-semibold text-emerald-400 flex items-center gap-2">
-                                <span>🚀</span> Mejores Trades
+                                <span>🚀</span> Best Trades
                             </h3>
                         </div>
                         {bestTrades.length > 0 ? (
@@ -388,7 +388,7 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                             </div>
                         ) : (
                             <div className="p-6 text-center text-slate-500">
-                                Sin trades positivos aún
+                                No profitable trades yet
                             </div>
                         )}
                     </div>
@@ -397,7 +397,7 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                     <div className="bg-slate-900/50 backdrop-blur-xl border border-red-500/30 rounded-2xl overflow-hidden">
                         <div className="px-4 py-3 border-b border-slate-800 bg-red-500/5">
                             <h3 className="font-semibold text-red-400 flex items-center gap-2">
-                                <span>📉</span> Peores Trades
+                                <span>📉</span> Worst Trades
                             </h3>
                         </div>
                         {worstTrades.length > 0 ? (
@@ -423,7 +423,7 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                         ) : (
                             <div className="p-6 text-center">
                                 <span className="text-2xl">🎉</span>
-                                <p className="text-emerald-400 font-medium mt-1">¡Ninguno en rojo!</p>
+                                <p className="text-emerald-400 font-medium mt-1">All in the green!</p>
                             </div>
                         )}
                     </div>
@@ -436,26 +436,26 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                     <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-xl p-4 text-center">
                         <div className="text-3xl mb-1">📊</div>
                         <div className="text-2xl font-bold text-slate-100">{group.holdings.length}</div>
-                        <div className="text-xs text-slate-500">Posiciones Totales</div>
+                        <div className="text-xs text-slate-500">Total Positions</div>
                     </div>
                     <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-xl p-4 text-center">
                         <div className="text-3xl mb-1">👥</div>
                         <div className="text-2xl font-bold text-slate-100">{group.members.length}</div>
-                        <div className="text-xs text-slate-500">Inversores</div>
+                        <div className="text-xs text-slate-500">Investors</div>
                     </div>
                     <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-xl p-4 text-center">
                         <div className="text-3xl mb-1">✅</div>
                         <div className="text-2xl font-bold text-emerald-400">
                             {allHoldingsWithPnl.filter(h => h.pnlPercent > 0).length}
                         </div>
-                        <div className="text-xs text-slate-500">En Verde</div>
+                        <div className="text-xs text-slate-500">In Green</div>
                     </div>
                     <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-xl p-4 text-center">
                         <div className="text-3xl mb-1">❌</div>
                         <div className="text-2xl font-bold text-red-400">
                             {allHoldingsWithPnl.filter(h => h.pnlPercent < 0).length}
                         </div>
-                        <div className="text-xs text-slate-500">En Rojo</div>
+                        <div className="text-xs text-slate-500">In Red</div>
                     </div>
                 </div>
             )}
@@ -464,9 +464,9 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
             {!hasAnyHoldings && (
                 <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-12 text-center">
                     <div className="text-6xl mb-4">🏁</div>
-                    <h3 className="text-xl font-semibold text-slate-200 mb-2">¡Empieza la carrera!</h3>
+                    <h3 className="text-xl font-semibold text-slate-200 mb-2">Start the race!</h3>
                     <p className="text-slate-400 max-w-md mx-auto">
-                        Añade posiciones a los inversores para ver quién lidera el ranking.
+                        Add positions to investors to see who leads the ranking.
                     </p>
                 </div>
             )}

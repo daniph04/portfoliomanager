@@ -12,9 +12,9 @@ interface TopNavProps {
 }
 
 const tabs = [
-    { id: "overview" as const, label: "Overview", icon: "📊" },
+    { id: "members" as const, label: "My Portfolio", icon: "👤" },
+    { id: "overview" as const, label: "Group", icon: "📊" },
     { id: "leaderboard" as const, label: "Ranking", icon: "🏆" },
-    { id: "members" as const, label: "Investors", icon: "👥" },
     { id: "activity" as const, label: "Activity", icon: "📈" },
 ];
 

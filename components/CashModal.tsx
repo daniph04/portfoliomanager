@@ -10,6 +10,17 @@ interface CashModalProps {
     onConfirm: (amount: number) => Promise<void>;
 }
 
+// Parse number that may use comma or period as decimal separator
+const parseLocaleNumber = (value: string): number => {
+    if (!value) return 0;
+    // Remove any characters except digits, dots, and commas
+    const cleaned = value.replace(/[^0-9.,]/g, "");
+    // Replace comma with period for parsing
+    const normalized = cleaned.replace(",", ".");
+    const parsed = parseFloat(normalized);
+    return isNaN(parsed) ? 0 : parsed;
+};
+
 export default function CashModal({ isOpen, mode, currentBalance, onClose, onConfirm }: CashModalProps) {
     const [amount, setAmount] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -18,7 +29,7 @@ export default function CashModal({ isOpen, mode, currentBalance, onClose, onCon
     if (!isOpen) return null;
 
     const handleSubmit = async () => {
-        const value = parseFloat(amount.replace(/[^0-9.]/g, ""));
+        const value = parseLocaleNumber(amount);
 
         if (isNaN(value) || value <= 0) {
             setError("Please enter a valid amount");
@@ -88,9 +99,10 @@ export default function CashModal({ isOpen, mode, currentBalance, onClose, onCon
                     </span>
                     <input
                         type="text"
-                        value={formatCurrency(amount)}
+                        inputMode="decimal"
+                        value={amount}
                         onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0"
+                        placeholder="0 (use . or , for decimals)"
                         className="w-full pl-10 pr-4 py-4 bg-slate-800 border-2 border-slate-700 focus:border-emerald-500 rounded-xl text-2xl font-bold text-slate-100 placeholder-slate-600 focus:outline-none transition-all"
                         autoFocus
                     />
@@ -113,8 +125,8 @@ export default function CashModal({ isOpen, mode, currentBalance, onClose, onCon
                         onClick={handleSubmit}
                         disabled={isSubmitting || !amount}
                         className={`flex-1 py-3 font-semibold rounded-xl transition-all disabled:opacity-50 ${mode === "deposit"
-                                ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white"
-                                : "bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white"
+                            ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white"
+                            : "bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white"
                             }`}
                     >
                         {isSubmitting ? "Processing..." : mode === "deposit" ? "Deposit" : "Withdraw"}

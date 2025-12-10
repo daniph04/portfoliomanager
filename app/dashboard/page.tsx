@@ -16,7 +16,7 @@ type TabType = "overview" | "leaderboard" | "members" | "activity";
 
 export default function DashboardPage() {
     const router = useRouter();
-    const [currentTab, setCurrentTab] = useState<TabType>("overview");
+    const [currentTab, setCurrentTab] = useState<TabType>("members");
     const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
     const [cashModalOpen, setCashModalOpen] = useState(false);
     const [cashModalMode, setCashModalMode] = useState<"deposit" | "withdraw">("deposit");

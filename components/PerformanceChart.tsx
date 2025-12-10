@@ -114,7 +114,7 @@ export default function PerformanceChart({
     const data = useMemo(() => {
         // Always add current value as the last point
         const currentPoint = {
-            label: "Ahora",
+            label: "Now",
             value: currentValue,
             timestamp: new Date().toISOString(),
         };
@@ -131,11 +131,11 @@ export default function PerformanceChart({
 
             // Format label based on time range
             if (timeRange === "1D") {
-                label = date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+                label = date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
             } else if (timeRange === "1W" || timeRange === "1M") {
-                label = date.toLocaleDateString("es-ES", { weekday: "short", day: "numeric" });
+                label = date.toLocaleDateString("en-US", { weekday: "short", day: "numeric" });
             } else {
-                label = date.toLocaleDateString("es-ES", { month: "short", day: "numeric" });
+                label = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
             }
 
             return {
@@ -229,7 +229,7 @@ export default function PerformanceChart({
                     </div>
                 ) : (
                     <div className="text-slate-400 text-sm">
-                        Sin posiciones activas
+                        No active positions
                     </div>
                 )}
             </div>
@@ -262,9 +262,9 @@ export default function PerformanceChart({
                     <div className="h-full flex items-center justify-center text-slate-500 text-sm">
                         <div className="text-center">
                             <div className="mb-2">📊</div>
-                            <div>Sin datos históricos aún</div>
+                            <div>No historical data yet</div>
                             <div className="text-xs text-slate-600 mt-1">
-                                Los datos se irán guardando con el tiempo
+                                Data will be saved over time
                             </div>
                         </div>
                     </div>
@@ -302,11 +302,11 @@ export default function PerformanceChart({
                                     border: "1px solid #334155",
                                     borderRadius: "8px",
                                 }}
-                                formatter={(value: number) => [formatCurrencyFull(value), "Valor"]}
+                                formatter={(value: number) => [formatCurrencyFull(value), "Value"]}
                                 labelFormatter={(label, payload) => {
                                     if (payload && payload[0]?.payload?.timestamp) {
                                         const date = new Date(payload[0].payload.timestamp);
-                                        return date.toLocaleString("es-ES", {
+                                        return date.toLocaleString("en-US", {
                                             weekday: "short",
                                             day: "numeric",
                                             month: "short",
@@ -340,7 +340,7 @@ export default function PerformanceChart({
                         <div className="text-lg font-semibold text-slate-300">{formatCurrency(totalCostBasis)}</div>
                     </div>
                     <div>
-                        <div className="text-xs text-slate-500 uppercase tracking-wider">Valor Actual</div>
+                        <div className="text-xs text-slate-500 uppercase tracking-wider">Current Value</div>
                         <div className="text-lg font-semibold text-slate-100">{formatCurrency(currentValue)}</div>
                     </div>
                 </div>
@@ -349,8 +349,8 @@ export default function PerformanceChart({
             {/* Data Info */}
             <div className="mt-3 text-xs text-slate-600 text-center">
                 {filteredHistory.length > 0
-                    ? `${filteredHistory.length} puntos de datos en este rango`
-                    : "Los snapshots se guardan cada vez que se actualizan los precios"
+                    ? `${filteredHistory.length} data points in this range`
+                    : "Snapshots are saved when prices update"
                 }
             </div>
         </div>

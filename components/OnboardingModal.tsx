@@ -14,6 +14,15 @@ interface OnboardingModalProps {
     }) => void;
 }
 
+// Parse number that may use comma or period as decimal separator
+const parseLocaleNumber = (value: string): number => {
+    if (!value) return 0;
+    // Replace comma with period for parsing
+    const normalized = value.replace(",", ".");
+    const parsed = parseFloat(normalized);
+    return isNaN(parsed) ? 0 : parsed;
+};
+
 export default function OnboardingModal({ onClose, onComplete }: OnboardingModalProps) {
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [name, setName] = useState("");
@@ -149,25 +158,24 @@ export default function OnboardingModal({ onClose, onComplete }: OnboardingModal
                         <div className="space-y-6">
                             <div>
                                 <h2 className="text-2xl font-bold text-slate-100">Portfolio Value</h2>
-                                <p className="text-slate-400 mt-1">¿Cuál es el valor total de tu portfolio?</p>
+                                <p className="text-slate-400 mt-1">What&apos;s your total portfolio value?</p>
                             </div>
 
                             <div className="relative">
                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">$</span>
                                 <input
-                                    type="number"
+                                    type="text"
+                                    inputMode="decimal"
                                     value={initialCash || ""}
-                                    onChange={(e) => setInitialCash(parseFloat(e.target.value) || 0)}
-                                    placeholder="0"
-                                    min="0"
-                                    step="100"
+                                    onChange={(e) => setInitialCash(parseLocaleNumber(e.target.value))}
+                                    placeholder="0 (use . or , for decimals)"
                                     autoFocus
                                     className="w-full px-4 py-3 pl-8 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-2xl font-mono"
                                 />
                             </div>
 
                             <p className="text-slate-500 text-sm">
-                                Ingresa el valor total de tu portfolio (dinero + inversiones). Cuando añadas holdings, se restará de este valor.
+                                Enter your total portfolio value (cash + investments). When you add holdings, it will be deducted from this amount.
                             </p>
 
                             {error && (
@@ -186,7 +194,7 @@ export default function OnboardingModal({ onClose, onComplete }: OnboardingModal
 
                             {/* Portfolio value summary */}
                             <div className="flex justify-between text-sm bg-slate-800/50 rounded-lg p-3">
-                                <span className="text-slate-400">Valor del Portfolio:</span>
+                                <span className="text-slate-400">Portfolio Value:</span>
                                 <span className="text-slate-200">{formatCurrency(initialCash)}</span>
                             </div>
 
@@ -243,30 +251,28 @@ export default function OnboardingModal({ onClose, onComplete }: OnboardingModal
                                                 <div className="flex-1">
                                                     <label className="text-xs text-slate-400">Quantity</label>
                                                     <input
-                                                        type="number"
+                                                        type="text"
+                                                        inputMode="decimal"
                                                         value={pendingHolding.quantity || ""}
                                                         onChange={(e) => setPendingHolding({
                                                             ...pendingHolding,
-                                                            quantity: parseFloat(e.target.value) || 0
+                                                            quantity: parseLocaleNumber(e.target.value)
                                                         })}
-                                                        placeholder="0"
-                                                        min="0"
-                                                        step="0.01"
+                                                        placeholder="0 (use . or ,)"
                                                         className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100"
                                                     />
                                                 </div>
                                                 <div className="flex-1">
                                                     <label className="text-xs text-slate-400">Avg Buy Price</label>
                                                     <input
-                                                        type="number"
+                                                        type="text"
+                                                        inputMode="decimal"
                                                         value={pendingHolding.avgBuyPrice || ""}
                                                         onChange={(e) => setPendingHolding({
                                                             ...pendingHolding,
-                                                            avgBuyPrice: parseFloat(e.target.value) || 0
+                                                            avgBuyPrice: parseLocaleNumber(e.target.value)
                                                         })}
-                                                        placeholder="0"
-                                                        min="0"
-                                                        step="0.01"
+                                                        placeholder="0 (use . or ,)"
                                                         className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100"
                                                     />
                                                 </div>
@@ -303,18 +309,18 @@ export default function OnboardingModal({ onClose, onComplete }: OnboardingModal
                             {holdings.length > 0 && (
                                 <div className="space-y-1 pt-2 border-t border-slate-800">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-slate-400">Total Invertido:</span>
+                                        <span className="text-slate-400">Total Invested:</span>
                                         <span className="text-slate-200">{formatCurrency(totalInvested)}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-slate-400">Disponible:</span>
+                                        <span className="text-slate-400">Available:</span>
                                         <span className={remainingCash >= 0 ? "text-emerald-400" : "text-red-400"}>
                                             {formatCurrency(remainingCash)}
                                         </span>
                                     </div>
                                     {remainingCash < 0 && (
                                         <p className="text-red-400 text-xs mt-2">
-                                            ⚠️ Has invertido más de lo disponible. Reduce holdings o aumenta el valor del portfolio.
+                                            ⚠️ You&apos;ve invested more than available. Reduce holdings or increase portfolio value.
                                         </p>
                                     )}
                                 </div>
@@ -341,7 +347,7 @@ export default function OnboardingModal({ onClose, onComplete }: OnboardingModal
                         </button>
                     </div>
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }

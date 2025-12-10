@@ -76,7 +76,7 @@ export default function HoldingFormModal({ open, mode, initialValues, availableC
         if (mode === "create" && availableCash !== undefined) {
             const totalCost = formData.quantity * formData.avgBuyPrice;
             if (totalCost > availableCash) {
-                newErrors.quantity = `Fondos insuficientes. Disponible: ${formatCurrency(availableCash)}`;
+                newErrors.quantity = `Insufficient funds. Available: ${formatCurrency(availableCash)}`;
             }
         }
 
@@ -161,7 +161,7 @@ export default function HoldingFormModal({ open, mode, initialValues, availableC
                     </h2>
                     {mode === "create" && availableCash !== undefined && (
                         <div className="mt-2 text-sm text-slate-400">
-                            Disponible: <span className="text-emerald-400 font-medium">{formatCurrency(availableCash)}</span>
+                            Available: <span className="text-emerald-400 font-medium">{formatCurrency(availableCash)}</span>
                         </div>
                     )}
                 </div>
@@ -256,7 +256,7 @@ export default function HoldingFormModal({ open, mode, initialValues, availableC
                     {/* Average Buy Price */}
                     <div>
                         <label htmlFor="avgBuyPrice" className="block text-sm font-medium text-slate-300 mb-1">
-                            Tu precio promedio de compra *
+                            Your average buy price *
                         </label>
                         <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
@@ -266,14 +266,14 @@ export default function HoldingFormModal({ open, mode, initialValues, availableC
                                 inputMode="decimal"
                                 value={formData.avgBuyPrice || ""}
                                 onChange={(e) => handleChange("avgBuyPrice", parseLocaleNumber(e.target.value))}
-                                placeholder="150.00 (usa . o ,)"
+                                placeholder="150.00 (use . or ,)"
                                 className={`w-full pl-8 pr-3 py-2.5 bg-slate-800 border ${errors.avgBuyPrice ? "border-red-500" : "border-slate-700"
                                     } rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent`}
                             />
                         </div>
                         {errors.avgBuyPrice && <p className="text-red-400 text-xs mt-1">{errors.avgBuyPrice}</p>}
                         <p className="text-xs text-slate-500 mt-1">
-                            El precio que pagaste por acción/unidad
+                            The price you paid per share/unit
                         </p>
                     </div>
 

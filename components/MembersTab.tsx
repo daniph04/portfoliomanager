@@ -174,9 +174,9 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
         return (
             <div className="flex flex-col items-center justify-center py-20">
                 <div className="text-6xl mb-4">👥</div>
-                <h3 className="text-xl font-semibold text-slate-200 mb-2">No hay inversores</h3>
+                <h3 className="text-xl font-semibold text-slate-200 mb-2">No investors</h3>
                 <p className="text-slate-400 text-center max-w-md">
-                    Los inversores serán configurados por el administrador.
+                    Investors will be configured by the administrator.
                 </p>
             </div>
         );
@@ -187,7 +187,7 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
             {/* Sidebar - Desktop */}
             <div className="hidden lg:block w-64 flex-shrink-0">
                 <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4 sticky top-20">
-                    <h3 className="text-lg font-semibold text-slate-100 mb-4">Inversores</h3>
+                    <h3 className="text-lg font-semibold text-slate-100 mb-4">Investors</h3>
                     <div className="space-y-1">
                         {group.members.map((member) => {
                             const holdings = getMemberHoldings(group.holdings, member.id);
@@ -228,7 +228,7 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
             <div className="flex-1 min-w-0">
                 {/* Mobile selector */}
                 <div className="lg:hidden mb-4">
-                    <h2 className="text-xl font-bold text-slate-100 mb-2">Inversores</h2>
+                    <h2 className="text-xl font-bold text-slate-100 mb-2">Investors</h2>
                     <div className="flex gap-2 overflow-x-auto pb-2">
                         {group.members.map((member) => {
                             const isSelected = selectedMemberId === member.id;
@@ -253,8 +253,8 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                 {!selectedMember && (
                     <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-12 text-center">
                         <div className="text-5xl mb-4">👈</div>
-                        <h3 className="text-xl font-semibold text-slate-200 mb-2">Selecciona un inversor</h3>
-                        <p className="text-slate-400">Elige un inversor de la lista para ver su portfolio.</p>
+                        <h3 className="text-xl font-semibold text-slate-200 mb-2">Select an investor</h3>
+                        <p className="text-slate-400">Choose an investor from the list to view their portfolio.</p>
                     </div>
                 )}
 
@@ -315,7 +315,7 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                                     </div>
                                     <div>
                                         <h2 className="text-xl font-bold text-slate-100">{selectedMember.name}</h2>
-                                        <p className="text-slate-400 text-sm">{memberHoldings.length} posiciones</p>
+                                        <p className="text-slate-400 text-sm">{memberHoldings.length} positions</p>
                                     </div>
                                 </div>
                                 <button
@@ -325,7 +325,7 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                     </svg>
-                                    <span className="hidden sm:inline">Añadir</span>
+                                    <span className="hidden sm:inline">Add</span>
                                 </button>
                             </div>
 
@@ -333,18 +333,18 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 {selectedMember.startingCapital && (
                                     <div className="bg-slate-800/50 rounded-xl p-3">
-                                        <div className="text-xs text-slate-500 uppercase">Capital Inicial</div>
+                                        <div className="text-xs text-slate-500 uppercase">Starting Capital</div>
                                         <div className="text-lg font-bold text-slate-200">
                                             {formatCurrency(selectedMember.startingCapital, 0)}
                                         </div>
                                     </div>
                                 )}
                                 <div className="bg-slate-800/50 rounded-xl p-3">
-                                    <div className="text-xs text-slate-500 uppercase">Invertido</div>
+                                    <div className="text-xs text-slate-500 uppercase">Invested</div>
                                     <div className="text-lg font-bold text-slate-300">{formatCurrency(costBasis, 0)}</div>
                                 </div>
                                 <div className="bg-slate-800/50 rounded-xl p-3">
-                                    <div className="text-xs text-slate-500 uppercase">Valor Actual</div>
+                                    <div className="text-xs text-slate-500 uppercase">Current Value</div>
                                     <div className="text-lg font-bold text-slate-100">{formatCurrency(totalValue, 0)}</div>
                                 </div>
                                 <div className="bg-slate-800/50 rounded-xl p-3">
@@ -360,7 +360,7 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                         {memberHoldings.length > 0 && performanceData.length > 0 && (
                             <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4">
                                 <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                    <span>📈</span> Rendimiento
+                                    <span>📈</span> Performance
                                 </h3>
                                 <div className="h-36">
                                     <ResponsiveContainer width="100%" height="100%">
@@ -382,7 +382,7 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                                                     border: "1px solid #334155",
                                                     borderRadius: "8px",
                                                 }}
-                                                formatter={(value: number) => [formatCurrency(value), "Valor"]}
+                                                formatter={(value: number) => [formatCurrency(value), "Value"]}
                                             />
                                             <Line
                                                 type="monotone"
@@ -401,7 +401,7 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                         {/* Asset Allocation */}
                         {memberHoldings.length > 0 && chartData.length > 0 && (
                             <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4">
-                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Distribución</h3>
+                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Distribution</h3>
                                 <div className="flex items-center gap-4">
                                     <DonutChart
                                         data={chartData}
@@ -441,22 +441,22 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                                 <svg className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                 </svg>
-                                {isRefreshing ? "Actualizando..." : "Actualizar precios"}
+                                {isRefreshing ? "Updating..." : "Refresh Prices"}
                             </button>
                         )}
 
                         {/* Holdings */}
                         <div>
-                            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Posiciones</h3>
+                            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Positions</h3>
                             {memberHoldings.length === 0 ? (
                                 <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 text-center">
                                     <div className="text-4xl mb-3">📋</div>
-                                    <p className="text-slate-400 mb-4">Sin posiciones abiertas</p>
+                                    <p className="text-slate-400 mb-4">No open positions</p>
                                     <button
                                         onClick={handleAddHolding}
                                         className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-colors"
                                     >
-                                        Añadir primera posición
+                                        Add first position
                                     </button>
                                 </div>
                             ) : (
@@ -493,13 +493,13 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                                                         onClick={() => handleEditHolding(holding)}
                                                         className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors text-sm font-medium"
                                                     >
-                                                        Editar
+                                                        Edit
                                                     </button>
                                                     <button
                                                         onClick={() => handleSellHolding(holding)}
                                                         className="flex-1 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors text-sm font-medium"
                                                     >
-                                                        Vender
+                                                        Sell
                                                     </button>
                                                 </div>
                                             </div>
