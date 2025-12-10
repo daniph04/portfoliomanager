@@ -117,55 +117,83 @@ export default function MyPortfolioTab({
     };
 
     return (
-        <div className="space-y-6">
-            {/* Header with user info */}
-            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-4">
+        <div className="space-y-6 animate-fade-in">
+            {/* Header with user info - Premium Card */}
+            <div className="card-premium rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-4">
-                        <div
-                            className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-lg"
-                            style={{ backgroundColor: getMemberColor(currentMember.colorHue) }}
-                        >
-                            {currentMember.name.charAt(0).toUpperCase()}
+                        {/* Avatar with glow effect */}
+                        <div className="relative">
+                            <div
+                                className="w-16 h-16 rounded-xl flex items-center justify-center text-2xl font-bold text-white shadow-lg"
+                                style={{ backgroundColor: getMemberColor(currentMember.colorHue) }}
+                            >
+                                {currentMember.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div
+                                className="absolute inset-0 rounded-xl blur-lg opacity-40"
+                                style={{ backgroundColor: getMemberColor(currentMember.colorHue) }}
+                            />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold text-slate-100">{currentMember.name}</h1>
-                            <p className="text-slate-400">{myHoldings.length} positions</p>
+                            <h1 className="text-2xl font-bold text-white">{currentMember.name}</h1>
+                            <p className="text-slate-400 text-sm">{myHoldings.length} position{myHoldings.length !== 1 ? 's' : ''}</p>
                         </div>
                     </div>
                     <button
                         onClick={handleAddHolding}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                        className="btn-premium flex items-center gap-2"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
-                        Add Position
+                        <span className="hidden sm:inline">Add Position</span>
+                        <span className="sm:hidden">Add</span>
                     </button>
                 </div>
 
-                {/* Portfolio stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-slate-800/50 rounded-xl p-4">
-                        <div className="text-xs text-slate-500 uppercase">Total Value</div>
+                {/* Portfolio stats - Premium Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {/* Total Value */}
+                    <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                        <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total Value</div>
                         <div className="text-xl font-bold text-white">{formatCurrency(totalWithCash, 0)}</div>
                     </div>
-                    <div className="bg-slate-800/50 rounded-xl p-4">
-                        <div className="text-xs text-slate-500 uppercase">Invested</div>
+
+                    {/* Invested */}
+                    <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                        <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Invested</div>
                         <div className="text-lg font-bold text-slate-300">{formatCurrency(costBasis, 0)}</div>
                     </div>
-                    <div className="bg-slate-800/50 rounded-xl p-4">
-                        <div className="text-xs text-slate-500 uppercase">P/L</div>
-                        <div className={`text-lg font-bold ${pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                            {pnl >= 0 ? "+" : ""}{formatCurrency(pnl, 0)} ({formatPercent(pnlPercent, 1)})
+
+                    {/* P&L with glow effect */}
+                    <div className={`bg-white/5 rounded-xl p-4 border ${pnl >= 0 ? 'border-emerald-500/20' : 'border-red-500/20'}`}>
+                        <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">P/L</div>
+                        <div className={`text-lg font-bold ${pnl >= 0 ? "pnl-positive" : "pnl-negative"}`}>
+                            {pnl >= 0 ? "+" : ""}{formatCurrency(pnl, 0)}
+                        </div>
+                        <div className={`text-xs ${pnl >= 0 ? "text-emerald-400/70" : "text-red-400/70"}`}>
+                            {formatPercent(pnlPercent, 1)}
                         </div>
                     </div>
-                    <div className="bg-slate-800/50 rounded-xl p-4">
-                        <div className="text-xs text-slate-500 uppercase">Cash</div>
-                        <div className="text-lg font-bold text-emerald-400">{formatCurrency(cashBalance, 0)}</div>
-                        <div className="flex gap-1 mt-1">
-                            <button onClick={onDeposit} className="text-xs px-2 py-0.5 bg-emerald-600/20 text-emerald-400 rounded">+ Deposit</button>
-                            <button onClick={onWithdraw} className="text-xs px-2 py-0.5 bg-slate-700 text-slate-400 rounded">- Withdraw</button>
+
+                    {/* Cash with actions */}
+                    <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                        <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Cash</div>
+                        <div className="text-lg font-bold text-cyan-400">{formatCurrency(cashBalance, 0)}</div>
+                        <div className="flex gap-1 mt-2">
+                            <button
+                                onClick={onDeposit}
+                                className="text-[10px] px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded-md font-medium hover:bg-emerald-500/30 transition-colors"
+                            >
+                                + Dep
+                            </button>
+                            <button
+                                onClick={onWithdraw}
+                                className="text-[10px] px-2 py-1 bg-slate-700/50 text-slate-400 rounded-md font-medium hover:bg-slate-700 transition-colors"
+                            >
+                                - Wd
+                            </button>
                         </div>
                     </div>
                 </div>

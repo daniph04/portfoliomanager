@@ -42,23 +42,27 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
 
     return (
         <>
-            {/* Top Header */}
-            <nav className="bg-slate-900/80 backdrop-blur-xl border-b border-slate-800 sticky top-0 z-40">
+            {/* Top Header - Premium Glass Effect */}
+            <nav className="glass sticky top-0 z-40 border-b border-white/5">
                 <div className="px-4 py-3">
                     <div className="flex items-center justify-between">
-                        {/* Left: Group Name */}
-                        <div className="flex items-center space-x-2 min-w-0 flex-1">
-                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
-                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                                </svg>
+                        {/* Left: Group Name with enhanced styling */}
+                        <div className="flex items-center space-x-3 min-w-0 flex-1">
+                            {/* Animated logo */}
+                            <div className="relative">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 via-cyan-500 to-emerald-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/20">
+                                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                    </svg>
+                                </div>
+                                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 blur-lg opacity-30 animate-pulse" />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <h1 className="text-lg font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent truncate">
+                                <h1 className="text-lg font-bold gradient-text truncate">
                                     {groupName || "Portfolio League"}
                                 </h1>
                                 {currentProfileName && (
-                                    <span className="text-xs text-slate-500 truncate block">
+                                    <span className="text-xs text-slate-400 truncate block font-medium">
                                         {currentProfileName}
                                     </span>
                                 )}
@@ -66,13 +70,13 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
                         </div>
 
                         {/* Right: Notification Bell + Menu button */}
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
                             <NotificationBell />
                             <button
                                 onClick={() => setShowMenu(!showMenu)}
-                                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0"
+                                className="p-2.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all duration-200 flex-shrink-0"
                             >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                                 </svg>
                             </button>
@@ -157,22 +161,39 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
                 </>
             )}
 
-            {/* Bottom Tab Bar */}
-            <div className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-800 z-40 safe-area-bottom">
-                <div className="flex items-center justify-around py-2 px-2">
+            {/* Bottom Tab Bar - Premium Glass */}
+            <div className="fixed bottom-0 left-0 right-0 glass border-t border-white/5 z-40 safe-area-bottom">
+                <div className="flex items-center justify-around py-2 px-1">
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}
                             onClick={() => onTabChange(tab.id)}
-                            className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg transition-all min-w-0 flex-1 ${currentTab === tab.id
+                            className={`relative flex flex-col items-center justify-center py-2 px-2 rounded-xl transition-all duration-300 min-w-0 flex-1 ${currentTab === tab.id
                                 ? "text-emerald-400"
-                                : "text-slate-500"
+                                : "text-slate-500 hover:text-slate-400"
                                 }`}
                         >
-                            <span className="text-xl mb-0.5">{tab.icon}</span>
-                            <span className={`text-xs font-medium truncate ${currentTab === tab.id ? 'text-emerald-400' : 'text-slate-500'}`}>
+                            {/* Active indicator line */}
+                            {currentTab === tab.id && (
+                                <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-1 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500" />
+                            )}
+
+                            {/* Icon with glow when active */}
+                            <div className={`text-xl mb-0.5 transition-transform duration-300 ${currentTab === tab.id ? 'scale-110' : ''}`}>
+                                {tab.icon}
+                            </div>
+
+                            <span className={`text-[10px] font-semibold truncate transition-all ${currentTab === tab.id
+                                ? 'text-emerald-400'
+                                : 'text-slate-500'
+                                }`}>
                                 {tab.label}
                             </span>
+
+                            {/* Background glow effect */}
+                            {currentTab === tab.id && (
+                                <div className="absolute inset-0 rounded-xl bg-emerald-500/10 -z-10" />
+                            )}
                         </button>
                     ))}
                 </div>
