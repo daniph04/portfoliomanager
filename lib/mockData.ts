@@ -9,4 +9,5 @@ export const initialGroupState: GroupState = {
     members: [],
     holdings: [],
     activity: [],
+    portfolioHistory: [],
 };
