@@ -88,15 +88,18 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
     }
 
     return (
-        <div className="space-y-6">
-            {/* Header Stats */}
-            <div className="bg-gradient-to-r from-amber-500/10 via-slate-900 to-emerald-500/10 border border-slate-700 rounded-2xl p-6">
+        <div className="space-y-6 animate-fade-in">
+            {/* Header Stats - Premium */}
+            <div className="card-premium rounded-2xl p-6 border-t-2 border-amber-500/50">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <span className="text-4xl">🏆</span>
+                    <div className="flex items-center gap-4">
+                        <div className="relative">
+                            <span className="text-5xl">🏆</span>
+                            <div className="absolute inset-0 blur-xl bg-amber-400/30 -z-10" />
+                        </div>
                         <div>
-                            <h2 className="text-2xl font-bold text-slate-100">Ranking</h2>
-                            <p className="text-slate-400">{group.members.length} investors</p>
+                            <h2 className="text-2xl font-bold gradient-text">Leaderboard</h2>
+                            <p className="text-slate-400">{group.members.length} investors competing</p>
                         </div>
                     </div>
                     <div className="grid grid-cols-3 gap-6 text-center">

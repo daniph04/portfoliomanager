@@ -263,11 +263,11 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
     }
 
     return (
-        <div className="space-y-6">
-            {/* Header with Refresh */}
+        <div className="space-y-6 animate-fade-in">
+            {/* Header with Refresh - Premium */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-100">Group Overview</h2>
+                    <h2 className="text-2xl font-bold gradient-text">Group Portfolio</h2>
                     <p className="text-slate-400 mt-1">{group.name} · {group.members.length} investor{group.members.length !== 1 ? "s" : ""}</p>
                 </div>
 
@@ -275,7 +275,7 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                     <button
                         onClick={() => handleRefreshPrices(true)}
                         disabled={isRefreshing}
-                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-800 text-slate-300 hover:text-white disabled:text-slate-500 rounded-lg transition-all flex items-center gap-2 text-sm"
+                        className="px-4 py-2.5 bg-white/5 hover:bg-white/10 disabled:bg-white/5 text-slate-300 hover:text-white disabled:text-slate-500 rounded-xl transition-all flex items-center gap-2 text-sm border border-white/10"
                     >
                         <svg
                             className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
@@ -285,7 +285,7 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                         >
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
-                        {isRefreshing ? "Refreshing..." : "Refresh Prices"}
+                        {isRefreshing ? "Refreshing..." : "Refresh"}
                     </button>
                 )}
             </div>
@@ -304,9 +304,9 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                 portfolioHistory={group.portfolioHistory || []}
             />
 
-            {/* Asset Allocation - Robinhood Style */}
-            <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">
-                <h3 className="text-lg font-semibold text-slate-100 mb-6">Asset Allocation</h3>
+            {/* Asset Allocation - Premium Card */}
+            <div className="card-premium rounded-2xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-6">Asset Allocation</h3>
 
                 <div className="flex flex-col lg:flex-row items-center gap-8">
                     {/* Category List */}

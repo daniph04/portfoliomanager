@@ -64,32 +64,43 @@ export default function ActivityTab({ group }: ActivityTabProps) {
     };
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div>
-                <h2 className="text-2xl font-bold text-slate-100">Activity Feed</h2>
-                <p className="text-slate-400 mt-1">Recent trades and portfolio updates</p>
+        <div className="space-y-6 animate-fade-in">
+            {/* Header - Premium */}
+            <div className="flex items-center gap-4">
+                <div className="relative">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div className="absolute inset-0 rounded-xl bg-violet-500 blur-xl opacity-30" />
+                </div>
+                <div>
+                    <h2 className="text-2xl font-bold gradient-text">Activity Feed</h2>
+                    <p className="text-slate-400">Recent trades and updates</p>
+                </div>
             </div>
 
             {/* Activity List */}
             <div className="space-y-3">
                 {sortedActivity.length === 0 ? (
-                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-12 text-center">
-                        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-slate-800 flex items-center justify-center">
-                            <svg className="w-10 h-10 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="card-premium rounded-2xl p-12 text-center">
+                        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
+                            <svg className="w-10 h-10 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                             </svg>
                         </div>
-                        <h3 className="text-xl font-semibold text-slate-200 mb-2">No activity yet</h3>
+                        <h3 className="text-xl font-semibold text-white mb-2">No activity yet</h3>
                         <p className="text-slate-400 max-w-md mx-auto">
-                            New trades and changes will appear here. Add an investor and some holdings to get started.
+                            Trades and portfolio changes will appear here.
                         </p>
                     </div>
                 ) : (
-                    sortedActivity.map((event) => (
+                    sortedActivity.map((event, index) => (
                         <div
                             key={event.id}
-                            className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-all duration-200"
+                            className={`card-premium rounded-xl p-4 opacity-0 animate-fade-in`}
+                            style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}
                         >
                             <div className="flex items-start space-x-4">
                                 {/* Icon */}
