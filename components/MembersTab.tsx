@@ -17,7 +17,10 @@ interface MembersTabProps {
     group: GroupState;
     selectedMemberId: string | null;
     currentProfileId: string | null;
+    cashBalance: number;
     onSelectMember: (memberId: string) => void;
+    onDeposit: () => void;
+    onWithdraw: () => void;
     helpers: GroupDataHelpers;
 }
 
@@ -28,7 +31,7 @@ const ASSET_COLORS: Record<string, string> = {
     OTHER: "#8E8E93",
 };
 
-export default function MembersTab({ group, selectedMemberId, currentProfileId, onSelectMember, helpers }: MembersTabProps) {
+export default function MembersTab({ group, selectedMemberId, currentProfileId, cashBalance, onSelectMember, onDeposit, onWithdraw, helpers }: MembersTabProps) {
     const [modalOpen, setModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<"create" | "edit">("create");
     const [editingHolding, setEditingHolding] = useState<Holding | null>(null);
@@ -258,6 +261,48 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                 {/* Selected member */}
                 {selectedMember && (
                     <div className="space-y-4">
+                        {/* Cash Balance Card - Premium Design */}
+                        {currentProfileId === selectedMember.id && (
+                            <div className="relative overflow-hidden bg-gradient-to-br from-emerald-900/40 via-slate-900/80 to-cyan-900/40 backdrop-blur-xl border border-emerald-500/20 rounded-2xl p-5">
+                                {/* Decorative elements */}
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl" />
+                                <div className="absolute bottom-0 left-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl" />
+
+                                <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-2xl">💰</span>
+                                            <span className="text-sm font-medium text-slate-400 uppercase tracking-wider">Available Cash</span>
+                                        </div>
+                                        <div className="text-3xl sm:text-4xl font-bold text-white">
+                                            ${cashBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={onDeposit}
+                                            className="flex-1 sm:flex-none px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 flex items-center justify-center gap-2"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                            </svg>
+                                            Deposit
+                                        </button>
+                                        <button
+                                            onClick={onWithdraw}
+                                            className="flex-1 sm:flex-none px-5 py-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl transition-all border border-slate-700 hover:border-slate-600 flex items-center justify-center gap-2"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                            </svg>
+                                            Withdraw
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Header */}
                         <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4 md:p-6">
                             <div className="flex items-center justify-between mb-4">
