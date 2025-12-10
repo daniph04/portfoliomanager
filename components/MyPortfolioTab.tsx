@@ -5,7 +5,7 @@ import { GroupState, Holding } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
 import { formatCurrency, formatPercent, getMemberColor, getHoldingPnl, getHoldingPnlPercent, getTotalCostBasis, getMemberHoldings, getTotalPortfolioValue } from "@/lib/utils";
 import HoldingFormModal from "./HoldingFormModal";
-import NotificationSettings from "./NotificationSettings";
+import PushNotificationSetup from "./PushNotificationSetup";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 interface MyPortfolioTabProps {
@@ -266,8 +266,8 @@ export default function MyPortfolioTab({
                 )}
             </div>
 
-            {/* Notification Settings */}
-            <NotificationSettings />
+            {/* Push Notification Settings */}
+            <PushNotificationSetup />
 
             {/* Holding Modal */}
             <HoldingFormModal
