@@ -166,6 +166,11 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
 
             if (Object.keys(validPrices).length > 0) {
                 helpers.updateHoldingPrices(validPrices);
+
+                // Record snapshots for all members after price update
+                group.members.forEach(member => {
+                    helpers.recordPortfolioSnapshot(member.id);
+                });
             }
 
             setLastRefresh(new Date());
@@ -292,7 +297,12 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
             )}
 
             {/* Performance Chart - Robinhood Style */}
-            <PerformanceChart currentValue={totalHoldingsValue} totalCostBasis={totalCostBasis} hasHoldings={group.holdings.length > 0} />
+            <PerformanceChart
+                currentValue={totalHoldingsValue}
+                totalCostBasis={totalCostBasis}
+                hasHoldings={group.holdings.length > 0}
+                portfolioHistory={group.portfolioHistory || []}
+            />
 
             {/* Asset Allocation - Robinhood Style */}
             <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-6">

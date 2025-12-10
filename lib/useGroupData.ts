@@ -10,7 +10,8 @@ import {
     SellHoldingOptions,
     CreateProfileInput,
     AppState,
-    UserSession
+    UserSession,
+    PortfolioSnapshot
 } from "./types";
 import { generateId, generateRandomHue } from "./utils";
 
@@ -25,6 +26,7 @@ function createEmptyGroup(name: string): GroupState {
         members: [],
         holdings: [],
         activity: [],
+        portfolioHistory: [],
     };
 }
 
@@ -65,6 +67,10 @@ export interface GroupDataHelpers {
 
     // Price operations
     updateHoldingPrices: (priceMap: Record<string, number>) => void;
+
+    // Portfolio history
+    getPortfolioHistory: (memberId: string) => PortfolioSnapshot[];
+    recordPortfolioSnapshot: (memberId: string) => void;
 }
 
 export function usePersistentGroupData(): {
@@ -106,6 +112,7 @@ export function usePersistentGroupData(): {
                         })),
                         holdings: parsed.holdings || [],
                         activity: [], // Clear old activity as requested
+                        portfolioHistory: [],
                     };
                     setAppState({ groups: [migratedGroup], currentSession: null });
                 } else {
@@ -122,6 +129,7 @@ export function usePersistentGroupData(): {
                             members: [],
                             holdings: [],
                             activity: [],
+                            portfolioHistory: [],
                         };
                         localStorage.setItem(`group_password_${nanosectaGroup.id}`, btoa("Pibes2004@"));
                         parsed.groups.push(nanosectaGroup);
@@ -137,6 +145,7 @@ export function usePersistentGroupData(): {
                     members: [],
                     holdings: [],
                     activity: [],
+                    portfolioHistory: [],
                 };
                 localStorage.setItem(`group_password_${nanosectaGroup.id}`, btoa("Pibes2004@"));
                 setAppState({ groups: [nanosectaGroup], currentSession: null });
@@ -298,12 +307,31 @@ export function usePersistentGroupData(): {
             });
         });
 
-        updateGroup(groupId, prev => ({
-            ...prev,
-            members: [...prev.members, newMember],
-            holdings: [...prev.holdings, ...newHoldings],
-            activity: [...activities, ...prev.activity],
-        }));
+        updateGroup(groupId, prev => {
+            const updatedGroup = {
+                ...prev,
+                members: [...prev.members, newMember],
+                holdings: [...prev.holdings, ...newHoldings],
+                activity: [...activities, ...prev.activity],
+            };
+
+            // Create initial snapshot for the new member
+            const holdingsValue = newHoldings.reduce((sum, h) => sum + (h.quantity * h.currentPrice), 0);
+            const totalValue = input.initialCash + holdingsValue;
+            const costBasis = newHoldings.reduce((sum, h) => sum + (h.quantity * h.avgBuyPrice), 0);
+
+            const initialSnapshot: PortfolioSnapshot = {
+                timestamp: now,
+                memberId: newMember.id,
+                totalValue,
+                costBasis,
+            };
+
+            return {
+                ...updatedGroup,
+                portfolioHistory: [...(prev.portfolioHistory || []), initialSnapshot],
+            };
+        });
 
         return newMember;
     }, [updateGroup]);
@@ -585,6 +613,56 @@ export function usePersistentGroupData(): {
         });
     }, [session, updateGroup]);
 
+    // Get portfolio history for a member
+    const getPortfolioHistory = useCallback((memberId: string): PortfolioSnapshot[] => {
+        if (!session?.groupId) return [];
+        const currentGroup = appState.groups.find(g => g.id === session.groupId);
+        if (!currentGroup) return [];
+        return (currentGroup.portfolioHistory || []).filter(s => s.memberId === memberId);
+    }, [session, appState.groups]);
+
+    // Record a portfolio snapshot for a member
+    const recordPortfolioSnapshot = useCallback((memberId: string) => {
+        if (!session?.groupId) return;
+
+        const currentGroup = appState.groups.find(g => g.id === session.groupId);
+        if (!currentGroup) return;
+
+        const member = currentGroup.members.find(m => m.id === memberId);
+        if (!member) return;
+
+        const memberHoldings = currentGroup.holdings.filter(h => h.memberId === memberId);
+        const holdingsValue = memberHoldings.reduce((sum, h) => sum + (h.quantity * h.currentPrice), 0);
+        const totalValue = member.cashBalance + holdingsValue;
+        const costBasis = memberHoldings.reduce((sum, h) => sum + (h.quantity * h.avgBuyPrice), 0);
+
+        const now = new Date().toISOString();
+
+        // Only add snapshot if enough time has passed (at least 1 minute since last)
+        const history = currentGroup.portfolioHistory || [];
+        const memberHistory = history.filter(s => s.memberId === memberId);
+        const lastSnapshot = memberHistory[memberHistory.length - 1];
+
+        if (lastSnapshot) {
+            const lastTime = new Date(lastSnapshot.timestamp).getTime();
+            const nowTime = new Date(now).getTime();
+            // Skip if less than 1 minute since last snapshot
+            if (nowTime - lastTime < 60 * 1000) return;
+        }
+
+        const newSnapshot: PortfolioSnapshot = {
+            timestamp: now,
+            memberId,
+            totalValue,
+            costBasis,
+        };
+
+        updateGroup(session.groupId, prev => ({
+            ...prev,
+            portfolioHistory: [...(prev.portfolioHistory || []), newSnapshot],
+        }));
+    }, [session, appState.groups, updateGroup]);
+
     const helpers: GroupDataHelpers = {
         createGroup,
         findGroup,
@@ -603,6 +681,8 @@ export function usePersistentGroupData(): {
         addNoteActivity,
         clearAllActivity,
         updateHoldingPrices,
+        getPortfolioHistory,
+        recordPortfolioSnapshot,
     };
 
     return { group, appState, session, helpers, isLoading };

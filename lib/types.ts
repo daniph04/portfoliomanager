@@ -43,6 +43,14 @@ export interface ActivityEvent {
     amountChangeUsd?: number;   // Realized P/L for SELL events, or deposit/withdraw amount
 }
 
+// Portfolio value snapshot for historical chart
+export interface PortfolioSnapshot {
+    timestamp: string;          // ISO timestamp
+    memberId: string;           // Which member this snapshot is for
+    totalValue: number;         // Cash + Holdings value at this moment
+    costBasis: number;          // Total cost basis at this moment
+}
+
 // Current user session (stored separately from group)
 export interface UserSession {
     groupId: string;            // Which group is selected
@@ -56,6 +64,7 @@ export interface GroupState {
     members: Member[];
     holdings: Holding[];        // Flat array, each holding has memberId
     activity: ActivityEvent[];
+    portfolioHistory: PortfolioSnapshot[];  // Real historical snapshots
 }
 
 // Multi-group storage (localStorage stores multiple groups)
