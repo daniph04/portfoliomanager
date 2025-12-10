@@ -6,21 +6,22 @@ import { useUser } from "@/lib/hooks/useUser";
 
 export default function GroupsPage() {
     const router = useRouter();
-    const { currentUser, isLoading, getUserGroups, createGroup, joinGroup, setCurrentGroup } = useUser();
+    const { currentUser, isAuthenticated, isLoading, getUserGroups, createGroup, joinGroup, setCurrentGroup, signOut, groups } = useUser();
 
     const [mode, setMode] = useState<"join" | "create">("join");
     const [groupName, setGroupName] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const userGroups = currentUser ? getUserGroups() : [];
+    const userGroups = getUserGroups();
 
-    // Redirect if not logged in
+    // Redirect if not authenticated
     useEffect(() => {
-        if (!isLoading && !currentUser) {
+        if (!isLoading && !isAuthenticated) {
             router.push("/");
         }
-    }, [isLoading, currentUser, router]);
+    }, [isLoading, isAuthenticated, router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -34,6 +35,8 @@ export default function GroupsPage() {
             setError("Please enter a password");
             return;
         }
+
+        setIsSubmitting(true);
 
         try {
             if (mode === "create") {
@@ -55,12 +58,19 @@ export default function GroupsPage() {
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : "An error occurred");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     const handleSelectExistingGroup = (groupId: string) => {
         setCurrentGroup(groupId);
         router.push("/dashboard");
+    };
+
+    const handleLogout = async () => {
+        await signOut();
+        router.push("/");
     };
 
     if (isLoading) {
@@ -83,13 +93,13 @@ export default function GroupsPage() {
                     <h1 className="text-3xl font-bold text-slate-100">
                         Hey {currentUser?.name}! 👋
                     </h1>
-                    <p className="text-slate-400 mt-2">Join or create a group to get started</p>
+                    <p className="text-slate-400 mt-2">Únete o crea un grupo para empezar</p>
                 </div>
 
                 {/* Existing Groups */}
                 {userGroups.length > 0 && (
                     <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 mb-6">
-                        <h2 className="text-lg font-semibold text-slate-100 mb-4">Your Groups</h2>
+                        <h2 className="text-lg font-semibold text-slate-100 mb-4">Tus Grupos</h2>
                         <div className="space-y-2">
                             {userGroups.map((group) => (
                                 <button
@@ -116,7 +126,7 @@ export default function GroupsPage() {
                                 : "bg-slate-800 text-slate-400 hover:text-slate-200"
                                 }`}
                         >
-                            Join Group
+                            Unirse a Grupo
                         </button>
                         <button
                             onClick={() => { setMode("create"); setError(null); }}
@@ -125,33 +135,33 @@ export default function GroupsPage() {
                                 : "bg-slate-800 text-slate-400 hover:text-slate-200"
                                 }`}
                         >
-                            Create Group
+                            Crear Grupo
                         </button>
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">
-                                Group Name
+                                Nombre del Grupo
                             </label>
                             <input
                                 type="text"
                                 value={groupName}
                                 onChange={(e) => setGroupName(e.target.value)}
-                                placeholder={mode === "create" ? "My Investing Group" : "Enter group name..."}
+                                placeholder={mode === "create" ? "Mi Grupo de Inversión" : "Nombre del grupo..."}
                                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             />
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">
-                                Password
+                                Contraseña del Grupo
                             </label>
                             <input
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                placeholder={mode === "create" ? "Choose a password" : "Enter password..."}
+                                placeholder={mode === "create" ? "Elige una contraseña" : "Contraseña..."}
                                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             />
                         </div>
@@ -164,9 +174,10 @@ export default function GroupsPage() {
 
                         <button
                             type="submit"
-                            className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold rounded-xl transition-all"
+                            disabled={isSubmitting}
+                            className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-semibold rounded-xl transition-all"
                         >
-                            {mode === "create" ? "Create Group" : "Join Group"}
+                            {isSubmitting ? "Cargando..." : mode === "create" ? "Crear Grupo" : "Unirse al Grupo"}
                         </button>
                     </form>
                 </div>
@@ -174,10 +185,10 @@ export default function GroupsPage() {
                 {/* Logout */}
                 <div className="text-center mt-6">
                     <button
-                        onClick={() => router.push("/")}
+                        onClick={handleLogout}
                         className="text-slate-500 hover:text-slate-300 text-sm transition-colors"
                     >
-                        Switch Account
+                        Cerrar Sesión
                     </button>
                 </div>
             </div>

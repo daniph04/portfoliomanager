@@ -29,7 +29,7 @@ export interface Member {
 }
 
 // Activity event types
-export type ActivityType = "BUY" | "SELL" | "UPDATE" | "NOTE" | "DEPOSIT" | "WITHDRAW";
+export type ActivityType = "BUY" | "SELL" | "UPDATE" | "NOTE" | "DEPOSIT" | "WITHDRAW" | "JOIN";
 
 // Activity event for tracking all portfolio changes
 export interface ActivityEvent {

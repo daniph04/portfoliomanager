@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { usePersistentGroupData } from "@/lib/useGroupData";
+import { useUser } from "@/lib/hooks/useUser";
 import TopNav from "@/components/TopNav";
-import Sidebar from "@/components/Sidebar";
 import OverviewTab from "@/components/OverviewTab";
 import LeaderboardTab from "@/components/LeaderboardTab";
 import MembersTab from "@/components/MembersTab";
 import ActivityTab from "@/components/ActivityTab";
+import { GroupState, Member, Holding, ActivityEvent } from "@/lib/types";
+import { GroupDataHelpers } from "@/lib/useGroupData";
 
 type TabType = "overview" | "leaderboard" | "members" | "activity";
 
@@ -16,37 +17,109 @@ export default function DashboardPage() {
     const router = useRouter();
     const [currentTab, setCurrentTab] = useState<TabType>("overview");
     const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
-    const [memberSearchQuery, setMemberSearchQuery] = useState("");
-    const { group, session, helpers, isLoading } = usePersistentGroupData();
 
-    // Current user's profile ID from session
-    const currentProfileId = session?.profileId || null;
+    const {
+        currentUser,
+        isAuthenticated,
+        isLoading,
+        currentGroup,
+        users,
+        holdings,
+        activity,
+        getUserHoldings,
+        addHolding,
+        updateHolding,
+        deleteHolding,
+        refreshData,
+    } = useUser();
 
-    // Access guard - redirect if no session
+    // Redirect if not authenticated or no group
     useEffect(() => {
-        if (!isLoading && (!session?.groupId || !session?.profileId)) {
-            if (!session?.groupId) {
-                router.push("/");
-            } else {
-                router.push("/select-profile");
+        if (!isLoading && !isAuthenticated) {
+            router.push("/");
+        } else if (!isLoading && isAuthenticated && !currentGroup) {
+            router.push("/groups");
+        }
+    }, [isLoading, isAuthenticated, currentGroup, router]);
+
+    // Auto-select current user
+    useEffect(() => {
+        if (!isLoading && users.length > 0 && !selectedMemberId) {
+            if (currentUser && users.some(u => u.id === currentUser.id)) {
+                setSelectedMemberId(currentUser.id);
+            } else if (users.length > 0) {
+                setSelectedMemberId(users[0].id);
             }
         }
-    }, [isLoading, session, router]);
+    }, [isLoading, users, selectedMemberId, currentUser]);
 
-    // Auto-select current profile in sidebar, or first member
-    useEffect(() => {
-        if (!isLoading && group.members.length > 0 && !selectedMemberId) {
-            // Default to current user's profile
-            if (currentProfileId && group.members.some(m => m.id === currentProfileId)) {
-                setSelectedMemberId(currentProfileId);
-            } else {
-                setSelectedMemberId(group.members[0].id);
+    // Adapt data to old GroupState format for compatibility with existing components
+    const adaptedGroup: GroupState = {
+        id: currentGroup?.id || "",
+        name: currentGroup?.name || "",
+        members: users.map(u => ({
+            id: u.id,
+            name: u.name,
+            colorHue: Math.abs(u.name.charCodeAt(0) * 137) % 360,
+            cashBalance: u.cashBalance,
+            totalRealizedPnl: u.totalRealizedPnl,
+            createdAt: u.createdAt,
+        })),
+        holdings: holdings.map(h => ({
+            id: h.id,
+            memberId: h.userId,
+            symbol: h.symbol,
+            name: h.name,
+            assetClass: h.assetClass,
+            quantity: h.quantity,
+            avgBuyPrice: h.avgBuyPrice,
+            currentPrice: h.currentPrice,
+            cryptoId: h.cryptoId,
+        })),
+        activity: activity.map(a => ({
+            id: a.id,
+            timestamp: a.createdAt,
+            memberId: a.userId,
+            type: a.type,
+            symbol: a.symbol,
+            title: a.title,
+            description: a.description,
+            amountChangeUsd: a.amountChangeUsd,
+        })),
+        portfolioHistory: [],
+    };
+
+    // Adapt helpers to work with Supabase (cast to any to handle async differences)
+    const adaptedHelpers: any = {
+        updateHoldingPrices: async (priceMap: Record<string, number>) => {
+            for (const h of holdings) {
+                const newPrice = priceMap[h.symbol];
+                if (newPrice !== undefined && newPrice !== h.currentPrice) {
+                    await updateHolding(h.id, { currentPrice: newPrice });
+                }
             }
-        }
-    }, [isLoading, group.members, selectedMemberId, currentProfileId]);
-
-    // Get current user's name for display
-    const currentProfile = group.members.find(m => m.id === currentProfileId);
+        },
+        addHolding: async (memberId: string, input: any) => {
+            if (memberId !== currentUser?.id) return null;
+            const result = await addHolding(input);
+            return result ? {
+                id: result.id,
+                memberId: result.userId,
+                symbol: result.symbol,
+                name: result.name,
+                assetClass: result.assetClass,
+                quantity: result.quantity,
+                avgBuyPrice: result.avgBuyPrice,
+                currentPrice: result.currentPrice,
+                cryptoId: result.cryptoId,
+            } : null;
+        },
+        sellHolding: async (holdingId: string) => {
+            await deleteHolding(holdingId);
+        },
+        recordPortfolioSnapshot: () => { },
+        getPortfolioHistory: () => [],
+    };
 
     if (isLoading) {
         return (
@@ -56,7 +129,7 @@ export default function DashboardPage() {
         );
     }
 
-    if (!session?.groupId) {
+    if (!isAuthenticated || !currentGroup) {
         return null; // Will redirect
     }
 
@@ -71,29 +144,29 @@ export default function DashboardPage() {
                 <TopNav
                     currentTab={currentTab}
                     onTabChange={setCurrentTab}
-                    groupName={group.name}
-                    currentProfileName={currentProfile?.name}
+                    groupName={currentGroup.name}
+                    currentProfileName={currentUser?.name}
                 />
 
-                {/* Main content - full width on mobile */}
+                {/* Main content */}
                 <main className="flex-1 overflow-y-auto p-4">
                     {currentTab === "overview" && (
-                        <OverviewTab group={group} helpers={helpers} />
+                        <OverviewTab group={adaptedGroup} helpers={adaptedHelpers as GroupDataHelpers} />
                     )}
                     {currentTab === "leaderboard" && (
-                        <LeaderboardTab group={group} />
+                        <LeaderboardTab group={adaptedGroup} />
                     )}
                     {currentTab === "members" && (
                         <MembersTab
-                            group={group}
+                            group={adaptedGroup}
                             selectedMemberId={selectedMemberId}
-                            currentProfileId={currentProfileId}
+                            currentProfileId={currentUser?.id || null}
                             onSelectMember={setSelectedMemberId}
-                            helpers={helpers}
+                            helpers={adaptedHelpers as GroupDataHelpers}
                         />
                     )}
                     {currentTab === "activity" && (
-                        <ActivityTab group={group} />
+                        <ActivityTab group={adaptedGroup} />
                     )}
                 </main>
             </div>
