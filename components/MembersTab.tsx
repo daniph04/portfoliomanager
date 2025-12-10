@@ -455,12 +455,14 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                                 <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 text-center">
                                     <div className="text-4xl mb-3">📋</div>
                                     <p className="text-slate-400 mb-4">No open positions</p>
-                                    <button
-                                        onClick={handleAddHolding}
-                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-colors"
-                                    >
-                                        Add first position
-                                    </button>
+                                    {!readOnly && (
+                                        <button
+                                            onClick={handleAddHolding}
+                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-colors"
+                                        >
+                                            Add first position
+                                        </button>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="space-y-2">

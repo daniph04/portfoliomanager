@@ -5,6 +5,26 @@ import { createClient } from '@/lib/supabase/client';
 import { SupabaseClient, User } from '@supabase/supabase-js';
 import { showLocalNotification, generateActivityNotification, shouldShowNotification } from '@/lib/notifications';
 
+// Helper to send push notification to other group members
+const sendPushToGroup = async (
+    groupId: string,
+    senderId: string,
+    title: string,
+    body: string,
+    type: 'BUY' | 'SELL' | 'DEPOSIT' | 'WITHDRAW' | 'JOIN',
+    symbol?: string
+) => {
+    try {
+        await fetch('/api/send-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ groupId, senderId, title, body, type, symbol }),
+        });
+    } catch (error) {
+        console.error('Failed to send push notification:', error);
+    }
+};
+
 // Types
 export interface UserProfile {
     id: string;
@@ -339,28 +359,48 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
     // Deposit cash
     const depositCash = async (amount: number) => {
-        if (!authUser || !currentUser) return;
+        if (!authUser || !currentUser || !currentGroupId) return;
         const newBalance = currentUser.cashBalance + amount;
         await updateUser({ cashBalance: newBalance });
 
-        // Show notification
+        // Show local notification
         if (shouldShowNotification('DEPOSIT')) {
             const notification = generateActivityNotification('DEPOSIT', currentUser.name, undefined, amount);
             showLocalNotification(notification);
         }
+
+        // Send push to other group members
+        const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        sendPushToGroup(
+            currentGroupId,
+            authUser.id,
+            `${currentUser.name} deposited cash`,
+            `Added ${formattedAmount} to their portfolio`,
+            'DEPOSIT'
+        );
     };
 
     // Withdraw cash
     const withdrawCash = async (amount: number) => {
-        if (!authUser || !currentUser) return;
+        if (!authUser || !currentUser || !currentGroupId) return;
         const newBalance = Math.max(0, currentUser.cashBalance - amount);
         await updateUser({ cashBalance: newBalance });
 
-        // Show notification
+        // Show local notification
         if (shouldShowNotification('WITHDRAW')) {
             const notification = generateActivityNotification('WITHDRAW', currentUser.name, undefined, amount);
             showLocalNotification(notification);
         }
+
+        // Send push to other group members
+        const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        sendPushToGroup(
+            currentGroupId,
+            authUser.id,
+            `${currentUser.name} withdrew cash`,
+            `Removed ${formattedAmount} from their portfolio`,
+            'WITHDRAW'
+        );
     };
 
     // Add holding
@@ -387,11 +427,25 @@ export function UserProvider({ children }: { children: ReactNode }) {
             return null;
         }
 
-        // Show notification
+        // Show local notification
         if (shouldShowNotification('BUY') && data) {
             const totalCost = holding.quantity * holding.avgBuyPrice;
             const notification = generateActivityNotification('BUY', currentUser?.name || 'You', holding.symbol, totalCost);
             showLocalNotification(notification);
+        }
+
+        // Send push to other group members
+        if (currentGroupId && currentUser && data) {
+            const totalCost = holding.quantity * holding.avgBuyPrice;
+            const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalCost);
+            sendPushToGroup(
+                currentGroupId,
+                authUser.id,
+                `${currentUser.name} bought ${holding.symbol}`,
+                `Invested ${formattedAmount} in ${holding.name}`,
+                'BUY',
+                holding.symbol
+            );
         }
 
         await refreshData();
@@ -420,11 +474,25 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
         await supabase.from('user_holdings').delete().eq('id', id);
 
-        // Show notification
+        // Show local notification
         if (shouldShowNotification('SELL') && holdingToSell) {
             const totalValue = holdingToSell.quantity * holdingToSell.currentPrice;
             const notification = generateActivityNotification('SELL', currentUser?.name || 'You', holdingToSell.symbol, totalValue);
             showLocalNotification(notification);
+        }
+
+        // Send push to other group members
+        if (currentGroupId && currentUser && holdingToSell) {
+            const totalValue = holdingToSell.quantity * holdingToSell.currentPrice;
+            const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalValue);
+            sendPushToGroup(
+                currentGroupId,
+                authUser?.id || '',
+                `${currentUser.name} sold ${holdingToSell.symbol}`,
+                `Closed position worth ${formattedAmount}`,
+                'SELL',
+                holdingToSell.symbol
+            );
         }
 
         await refreshData();
