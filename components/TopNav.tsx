@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useUser } from "@/lib/hooks/useUser";
 import { useRouter } from "next/navigation";
+import NotificationBell from "./NotificationBell";
 
 interface TopNavProps {
     currentTab: "portfolio" | "overview" | "investors" | "leaderboard" | "activity";
@@ -64,15 +65,18 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
                             </div>
                         </div>
 
-                        {/* Right: Menu button */}
-                        <button
-                            onClick={() => setShowMenu(!showMenu)}
-                            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0"
-                        >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                            </svg>
-                        </button>
+                        {/* Right: Notification Bell + Menu button */}
+                        <div className="flex items-center gap-1">
+                            <NotificationBell />
+                            <button
+                                onClick={() => setShowMenu(!showMenu)}
+                                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </nav>
