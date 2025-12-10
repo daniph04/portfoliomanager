@@ -22,7 +22,7 @@ export default function GroupsPage() {
         }
     }, [isLoading, currentUser, router]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
 
@@ -37,11 +37,15 @@ export default function GroupsPage() {
 
         try {
             if (mode === "create") {
-                const group = createGroup(groupName.trim(), password);
-                setCurrentGroup(group.id);
-                router.push("/dashboard");
+                const group = await createGroup(groupName.trim(), password);
+                if (group) {
+                    setCurrentGroup(group.id);
+                    router.push("/dashboard");
+                } else {
+                    setError("Failed to create group");
+                }
             } else {
-                const result = joinGroup(groupName.trim(), password);
+                const result = await joinGroup(groupName.trim(), password);
                 if (result.success && result.group) {
                     setCurrentGroup(result.group.id);
                     router.push("/dashboard");
@@ -108,8 +112,8 @@ export default function GroupsPage() {
                         <button
                             onClick={() => { setMode("join"); setError(null); }}
                             className={`flex-1 py-2 rounded-lg font-medium transition-all ${mode === "join"
-                                    ? "bg-emerald-600 text-white"
-                                    : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                                ? "bg-emerald-600 text-white"
+                                : "bg-slate-800 text-slate-400 hover:text-slate-200"
                                 }`}
                         >
                             Join Group
@@ -117,8 +121,8 @@ export default function GroupsPage() {
                         <button
                             onClick={() => { setMode("create"); setError(null); }}
                             className={`flex-1 py-2 rounded-lg font-medium transition-all ${mode === "create"
-                                    ? "bg-emerald-600 text-white"
-                                    : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                                ? "bg-emerald-600 text-white"
+                                : "bg-slate-800 text-slate-400 hover:text-slate-200"
                                 }`}
                         >
                             Create Group

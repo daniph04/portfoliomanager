@@ -1,11 +1,14 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { SupabaseClient, User } from '@supabase/supabase-js';
 
 // Types
 export interface UserProfile {
     id: string;
     name: string;
+    email: string;
     cashBalance: number;
     totalRealizedPnl: number;
     createdAt: string;
@@ -27,18 +30,8 @@ export interface UserHolding {
 export interface Group {
     id: string;
     name: string;
-    password: string;
     createdBy: string;
-    memberIds: string[];
     createdAt: string;
-}
-
-export interface AppData {
-    currentUserId: string | null;
-    users: UserProfile[];
-    holdings: UserHolding[];
-    groups: Group[];
-    activity: ActivityItem[];
 }
 
 export interface ActivityItem {
@@ -53,260 +46,457 @@ export interface ActivityItem {
     createdAt: string;
 }
 
-const STORAGE_KEY = 'portfolio_league_v4';
-
-const defaultAppData: AppData = {
-    currentUserId: null,
-    users: [],
-    holdings: [],
-    groups: [],
-    activity: [],
-};
-
 interface UserContextType {
     // State
     currentUser: UserProfile | null;
+    authUser: User | null;
     users: UserProfile[];
     holdings: UserHolding[];
     groups: Group[];
     activity: ActivityItem[];
     currentGroup: Group | null;
     isLoading: boolean;
+    isAuthenticated: boolean;
+
+    // Auth actions
+    signUp: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
+    signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+    signOut: () => Promise<void>;
 
     // User actions
-    login: (name: string) => UserProfile;
-    logout: () => void;
-    updateUser: (data: Partial<UserProfile>) => void;
+    updateUser: (data: Partial<UserProfile>) => Promise<void>;
 
     // Holdings actions
-    addHolding: (holding: Omit<UserHolding, 'id' | 'userId' | 'createdAt'>) => UserHolding;
-    updateHolding: (id: string, data: Partial<UserHolding>) => void;
-    deleteHolding: (id: string) => void;
+    addHolding: (holding: Omit<UserHolding, 'id' | 'userId' | 'createdAt'>) => Promise<UserHolding | null>;
+    updateHolding: (id: string, data: Partial<UserHolding>) => Promise<void>;
+    deleteHolding: (id: string) => Promise<void>;
     getUserHoldings: (userId?: string) => UserHolding[];
 
     // Group actions
-    createGroup: (name: string, password: string) => Group;
-    joinGroup: (name: string, password: string) => { success: boolean; error?: string; group?: Group };
-    leaveGroup: (groupId: string) => void;
+    createGroup: (name: string, password: string) => Promise<Group | null>;
+    joinGroup: (name: string, password: string) => Promise<{ success: boolean; error?: string; group?: Group }>;
+    leaveGroup: (groupId: string) => Promise<void>;
     setCurrentGroup: (groupId: string) => void;
     getUserGroups: () => Group[];
     getGroupMembers: (groupId: string) => UserProfile[];
 
     // Activity
-    addActivity: (groupId: string, type: ActivityItem['type'], title: string, description?: string, symbol?: string, amount?: number) => void;
+    addActivity: (groupId: string, type: ActivityItem['type'], title: string, description?: string, symbol?: string, amount?: number) => Promise<void>;
     getGroupActivity: (groupId: string) => ActivityItem[];
+
+    // Refresh
+    refreshData: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+// Singleton Supabase client
+let supabaseInstance: SupabaseClient | null = null;
+function getSupabase() {
+    if (!supabaseInstance) {
+        supabaseInstance = createClient();
+    }
+    return supabaseInstance;
+}
+
 export function UserProvider({ children }: { children: ReactNode }) {
-    const [data, setData] = useState<AppData>(defaultAppData);
+    const [authUser, setAuthUser] = useState<User | null>(null);
+    const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+    const [users, setUsers] = useState<UserProfile[]>([]);
+    const [holdings, setHoldings] = useState<UserHolding[]>([]);
+    const [groups, setGroups] = useState<Group[]>([]);
+    const [activity, setActivity] = useState<ActivityItem[]>([]);
     const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Load from localStorage
-    useEffect(() => {
+    const supabase = getSupabase();
+
+    // Convert DB format to app format
+    const toAppProfile = (p: any): UserProfile => ({
+        id: p.id,
+        name: p.name,
+        email: p.email,
+        cashBalance: Number(p.cash_balance) || 0,
+        totalRealizedPnl: Number(p.total_realized_pnl) || 0,
+        createdAt: p.created_at,
+    });
+
+    const toAppHolding = (h: any): UserHolding => ({
+        id: h.id,
+        userId: h.user_id,
+        symbol: h.symbol,
+        name: h.name,
+        assetClass: h.asset_class,
+        quantity: Number(h.quantity),
+        avgBuyPrice: Number(h.avg_buy_price),
+        currentPrice: Number(h.current_price),
+        cryptoId: h.crypto_id,
+        createdAt: h.created_at,
+    });
+
+    const toAppGroup = (g: any): Group => ({
+        id: g.id,
+        name: g.name,
+        createdBy: g.created_by,
+        createdAt: g.created_at,
+    });
+
+    const toAppActivity = (a: any): ActivityItem => ({
+        id: a.id,
+        groupId: a.group_id,
+        userId: a.user_id,
+        type: a.type,
+        symbol: a.symbol,
+        title: a.title,
+        description: a.description,
+        amountChangeUsd: a.amount_change_usd ? Number(a.amount_change_usd) : undefined,
+        createdAt: a.created_at,
+    });
+
+    // Refresh all data
+    const refreshData = useCallback(async () => {
+        if (!authUser) return;
+
         try {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                const parsed = JSON.parse(stored);
-                setData(parsed);
-                // Auto-select last group if user is logged in
-                if (parsed.currentUserId) {
-                    const userGroups = parsed.groups.filter((g: Group) =>
-                        g.memberIds.includes(parsed.currentUserId)
-                    );
-                    if (userGroups.length > 0) {
-                        setCurrentGroupId(userGroups[0].id);
+            // Get current user profile
+            const { data: profileData } = await supabase
+                .from('user_profiles')
+                .select('*')
+                .eq('id', authUser.id)
+                .single();
+
+            if (profileData) {
+                setCurrentUser(toAppProfile(profileData));
+            }
+
+            // Get user's groups
+            const { data: memberData } = await supabase
+                .from('group_members')
+                .select('group_id')
+                .eq('user_id', authUser.id);
+
+            if (memberData && memberData.length > 0) {
+                const groupIds = memberData.map(m => m.group_id);
+
+                // Get groups
+                const { data: groupsData } = await supabase
+                    .from('groups')
+                    .select('*')
+                    .in('id', groupIds);
+
+                if (groupsData) {
+                    setGroups(groupsData.map(toAppGroup));
+
+                    // Auto-select first group if none selected
+                    if (!currentGroupId && groupsData.length > 0) {
+                        setCurrentGroupId(groupsData[0].id);
+                    }
+                }
+
+                // Get all members of user's groups
+                const { data: allMembersData } = await supabase
+                    .from('group_members')
+                    .select('user_id')
+                    .in('group_id', groupIds);
+
+                if (allMembersData) {
+                    const userIds = [...new Set(allMembersData.map(m => m.user_id))];
+
+                    // Get profiles
+                    const { data: profilesData } = await supabase
+                        .from('user_profiles')
+                        .select('*')
+                        .in('id', userIds);
+
+                    if (profilesData) {
+                        setUsers(profilesData.map(toAppProfile));
+                    }
+
+                    // Get holdings
+                    const { data: holdingsData } = await supabase
+                        .from('user_holdings')
+                        .select('*')
+                        .in('user_id', userIds);
+
+                    if (holdingsData) {
+                        setHoldings(holdingsData.map(toAppHolding));
+                    }
+                }
+
+                // Get activity for current group
+                if (currentGroupId) {
+                    const { data: activityData } = await supabase
+                        .from('activity')
+                        .select('*')
+                        .eq('group_id', currentGroupId)
+                        .order('created_at', { ascending: false })
+                        .limit(50);
+
+                    if (activityData) {
+                        setActivity(activityData.map(toAppActivity));
                     }
                 }
             }
-        } catch (e) {
-            console.error('Failed to load data:', e);
+        } catch (error) {
+            console.error('Error refreshing data:', error);
         }
-        setIsLoading(false);
-    }, []);
+    }, [authUser, currentGroupId, supabase]);
 
-    // Save to localStorage
-    const save = useCallback((newData: AppData) => {
-        setData(newData);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
-    }, []);
+    // Initialize auth
+    useEffect(() => {
+        let isMounted = true;
 
-    // Current user
-    const currentUser = data.currentUserId
-        ? data.users.find(u => u.id === data.currentUserId) || null
-        : null;
-
-    // Current group
-    const currentGroup = currentGroupId
-        ? data.groups.find(g => g.id === currentGroupId) || null
-        : null;
-
-    // Login - create or find user by name
-    const login = useCallback((name: string): UserProfile => {
-        const trimmedName = name.trim();
-        let user = data.users.find(u => u.name.toLowerCase() === trimmedName.toLowerCase());
-
-        if (!user) {
-            user = {
-                id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                name: trimmedName,
-                cashBalance: 0,
-                totalRealizedPnl: 0,
-                createdAt: new Date().toISOString(),
-            };
-            const newData = {
-                ...data,
-                users: [...data.users, user],
-                currentUserId: user.id,
-            };
-            save(newData);
-        } else {
-            save({ ...data, currentUserId: user.id });
-        }
-
-        return user;
-    }, [data, save]);
-
-    // Logout
-    const logout = useCallback(() => {
-        save({ ...data, currentUserId: null });
-        setCurrentGroupId(null);
-    }, [data, save]);
-
-    // Update user
-    const updateUser = useCallback((updates: Partial<UserProfile>) => {
-        if (!data.currentUserId) return;
-
-        const newUsers = data.users.map(u =>
-            u.id === data.currentUserId ? { ...u, ...updates } : u
-        );
-        save({ ...data, users: newUsers });
-    }, [data, save]);
-
-    // Add holding
-    const addHolding = useCallback((holding: Omit<UserHolding, 'id' | 'userId' | 'createdAt'>): UserHolding => {
-        if (!data.currentUserId) throw new Error('Not logged in');
-
-        const newHolding: UserHolding = {
-            ...holding,
-            id: `holding_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            userId: data.currentUserId,
-            createdAt: new Date().toISOString(),
+        const init = async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (isMounted && user) {
+                    setAuthUser(user);
+                }
+            } catch (error) {
+                console.error('Auth init error:', error);
+            } finally {
+                if (isMounted) {
+                    setIsLoading(false);
+                }
+            }
         };
 
-        save({ ...data, holdings: [...data.holdings, newHolding] });
-        return newHolding;
-    }, [data, save]);
+        init();
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (event, session) => {
+                if (isMounted) {
+                    setAuthUser(session?.user ?? null);
+                    if (!session?.user) {
+                        // Clear all data on logout
+                        setCurrentUser(null);
+                        setUsers([]);
+                        setHoldings([]);
+                        setGroups([]);
+                        setActivity([]);
+                        setCurrentGroupId(null);
+                    }
+                }
+            }
+        );
+
+        return () => {
+            isMounted = false;
+            subscription.unsubscribe();
+        };
+    }, [supabase]);
+
+    // Refresh data when auth user changes
+    useEffect(() => {
+        if (authUser) {
+            refreshData();
+        }
+    }, [authUser, refreshData]);
+
+    // Sign up
+    const signUp = async (email: string, password: string, name: string) => {
+        const { error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: { data: { name } },
+        });
+        return { error: error?.message || null };
+    };
+
+    // Sign in
+    const signIn = async (email: string, password: string) => {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        return { error: error?.message || null };
+    };
+
+    // Sign out
+    const signOut = async () => {
+        await supabase.auth.signOut();
+    };
+
+    // Update user
+    const updateUser = async (updates: Partial<UserProfile>) => {
+        if (!authUser) return;
+
+        const dbUpdates: any = {};
+        if (updates.name) dbUpdates.name = updates.name;
+        if (updates.cashBalance !== undefined) dbUpdates.cash_balance = updates.cashBalance;
+        if (updates.totalRealizedPnl !== undefined) dbUpdates.total_realized_pnl = updates.totalRealizedPnl;
+
+        await supabase
+            .from('user_profiles')
+            .update({ ...dbUpdates, updated_at: new Date().toISOString() })
+            .eq('id', authUser.id);
+
+        await refreshData();
+    };
+
+    // Add holding
+    const addHolding = async (holding: Omit<UserHolding, 'id' | 'userId' | 'createdAt'>): Promise<UserHolding | null> => {
+        if (!authUser) return null;
+
+        const { data, error } = await supabase
+            .from('user_holdings')
+            .insert({
+                user_id: authUser.id,
+                symbol: holding.symbol,
+                name: holding.name,
+                asset_class: holding.assetClass,
+                quantity: holding.quantity,
+                avg_buy_price: holding.avgBuyPrice,
+                current_price: holding.currentPrice,
+                crypto_id: holding.cryptoId,
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error adding holding:', error);
+            return null;
+        }
+
+        await refreshData();
+        return data ? toAppHolding(data) : null;
+    };
 
     // Update holding
-    const updateHolding = useCallback((id: string, updates: Partial<UserHolding>) => {
-        const newHoldings = data.holdings.map(h =>
-            h.id === id ? { ...h, ...updates } : h
-        );
-        save({ ...data, holdings: newHoldings });
-    }, [data, save]);
+    const updateHolding = async (id: string, updates: Partial<UserHolding>) => {
+        const dbUpdates: any = { updated_at: new Date().toISOString() };
+        if (updates.quantity !== undefined) dbUpdates.quantity = updates.quantity;
+        if (updates.avgBuyPrice !== undefined) dbUpdates.avg_buy_price = updates.avgBuyPrice;
+        if (updates.currentPrice !== undefined) dbUpdates.current_price = updates.currentPrice;
+
+        await supabase
+            .from('user_holdings')
+            .update(dbUpdates)
+            .eq('id', id);
+
+        await refreshData();
+    };
 
     // Delete holding
-    const deleteHolding = useCallback((id: string) => {
-        save({ ...data, holdings: data.holdings.filter(h => h.id !== id) });
-    }, [data, save]);
+    const deleteHolding = async (id: string) => {
+        await supabase.from('user_holdings').delete().eq('id', id);
+        await refreshData();
+    };
 
     // Get user holdings
     const getUserHoldings = useCallback((userId?: string) => {
-        const targetId = userId || data.currentUserId;
-        return data.holdings.filter(h => h.userId === targetId);
-    }, [data]);
+        const targetId = userId || authUser?.id;
+        return holdings.filter(h => h.userId === targetId);
+    }, [holdings, authUser]);
 
     // Create group
-    const createGroup = useCallback((name: string, password: string): Group => {
-        if (!data.currentUserId) throw new Error('Not logged in');
+    const createGroup = async (name: string, password: string): Promise<Group | null> => {
+        if (!authUser) return null;
 
-        const newGroup: Group = {
-            id: `group_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            name: name.trim(),
-            password,
-            createdBy: data.currentUserId,
-            memberIds: [data.currentUserId],
-            createdAt: new Date().toISOString(),
-        };
+        const { data, error } = await supabase
+            .from('groups')
+            .insert({
+                name: name.trim(),
+                password_hash: btoa(password),
+                created_by: authUser.id,
+            })
+            .select()
+            .single();
 
-        save({ ...data, groups: [...data.groups, newGroup] });
-        setCurrentGroupId(newGroup.id);
-        return newGroup;
-    }, [data, save]);
+        if (error || !data) return null;
 
-    // Join group
-    const joinGroup = useCallback((name: string, password: string): { success: boolean; error?: string; group?: Group } => {
-        if (!data.currentUserId) return { success: false, error: 'Not logged in' };
-
-        const group = data.groups.find(g =>
-            g.name.toLowerCase() === name.trim().toLowerCase()
-        );
-
-        if (!group) return { success: false, error: 'Group not found' };
-        if (group.password !== password) return { success: false, error: 'Wrong password' };
-
-        if (group.memberIds.includes(data.currentUserId)) {
-            setCurrentGroupId(group.id);
-            return { success: true, group };
-        }
-
-        const updatedGroup = {
-            ...group,
-            memberIds: [...group.memberIds, data.currentUserId],
-        };
-
-        const newGroups = data.groups.map(g =>
-            g.id === group.id ? updatedGroup : g
-        );
-
-        save({ ...data, groups: newGroups });
-        setCurrentGroupId(group.id);
-        return { success: true, group: updatedGroup };
-    }, [data, save]);
-
-    // Leave group
-    const leaveGroup = useCallback((groupId: string) => {
-        if (!data.currentUserId) return;
-
-        const newGroups = data.groups.map(g => {
-            if (g.id === groupId) {
-                return {
-                    ...g,
-                    memberIds: g.memberIds.filter(id => id !== data.currentUserId),
-                };
-            }
-            return g;
+        // Join the group
+        await supabase.from('group_members').insert({
+            group_id: data.id,
+            user_id: authUser.id,
         });
 
-        save({ ...data, groups: newGroups });
-        if (currentGroupId === groupId) {
-            setCurrentGroupId(null);
+        // Add activity
+        await supabase.from('activity').insert({
+            group_id: data.id,
+            user_id: authUser.id,
+            type: 'JOIN',
+            title: `${currentUser?.name || 'Someone'} created the group`,
+        });
+
+        await refreshData();
+        setCurrentGroupId(data.id);
+        return toAppGroup(data);
+    };
+
+    // Join group
+    const joinGroup = async (name: string, password: string): Promise<{ success: boolean; error?: string; group?: Group }> => {
+        if (!authUser) return { success: false, error: 'Not authenticated' };
+
+        // Find group
+        const { data: groupData } = await supabase
+            .from('groups')
+            .select('*')
+            .ilike('name', name.trim())
+            .single();
+
+        if (!groupData) return { success: false, error: 'Group not found' };
+        if (atob(groupData.password_hash) !== password) return { success: false, error: 'Wrong password' };
+
+        // Check if already member
+        const { data: existing } = await supabase
+            .from('group_members')
+            .select('*')
+            .eq('group_id', groupData.id)
+            .eq('user_id', authUser.id)
+            .single();
+
+        if (!existing) {
+            // Join
+            await supabase.from('group_members').insert({
+                group_id: groupData.id,
+                user_id: authUser.id,
+            });
+
+            // Add activity
+            await supabase.from('activity').insert({
+                group_id: groupData.id,
+                user_id: authUser.id,
+                type: 'JOIN',
+                title: `${currentUser?.name || 'Someone'} joined the group`,
+            });
         }
-    }, [data, save, currentGroupId]);
+
+        await refreshData();
+        setCurrentGroupId(groupData.id);
+        return { success: true, group: toAppGroup(groupData) };
+    };
+
+    // Leave group
+    const leaveGroup = async (groupId: string) => {
+        if (!authUser) return;
+
+        await supabase
+            .from('group_members')
+            .delete()
+            .eq('group_id', groupId)
+            .eq('user_id', authUser.id);
+
+        await refreshData();
+        if (currentGroupId === groupId) {
+            setCurrentGroupId(groups.length > 1 ? groups.find(g => g.id !== groupId)?.id || null : null);
+        }
+    };
 
     // Set current group
-    const setCurrentGroup = useCallback((groupId: string) => {
+    const setCurrentGroup = (groupId: string) => {
         setCurrentGroupId(groupId);
-    }, []);
+    };
 
     // Get user's groups
-    const getUserGroups = useCallback(() => {
-        if (!data.currentUserId) return [];
-        return data.groups.filter(g => g.memberIds.includes(data.currentUserId!));
-    }, [data]);
+    const getUserGroups = useCallback(() => groups, [groups]);
 
     // Get group members
     const getGroupMembers = useCallback((groupId: string) => {
-        const group = data.groups.find(g => g.id === groupId);
-        if (!group) return [];
-        return data.users.filter(u => group.memberIds.includes(u.id));
-    }, [data]);
+        // For now return all users since they're filtered by group membership in refreshData
+        return users;
+    }, [users]);
 
     // Add activity
-    const addActivity = useCallback((
+    const addActivity = async (
         groupId: string,
         type: ActivityItem['type'],
         title: string,
@@ -314,41 +504,42 @@ export function UserProvider({ children }: { children: ReactNode }) {
         symbol?: string,
         amount?: number
     ) => {
-        if (!data.currentUserId) return;
+        if (!authUser) return;
 
-        const newActivity: ActivityItem = {
-            id: `activity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            groupId,
-            userId: data.currentUserId,
+        await supabase.from('activity').insert({
+            group_id: groupId,
+            user_id: authUser.id,
             type,
             title,
             description,
             symbol,
-            amountChangeUsd: amount,
-            createdAt: new Date().toISOString(),
-        };
+            amount_change_usd: amount,
+        });
 
-        save({ ...data, activity: [newActivity, ...data.activity].slice(0, 100) });
-    }, [data, save]);
+        await refreshData();
+    };
 
     // Get group activity
     const getGroupActivity = useCallback((groupId: string) => {
-        return data.activity
-            .filter(a => a.groupId === groupId)
-            .slice(0, 50);
-    }, [data]);
+        return activity.filter(a => a.groupId === groupId);
+    }, [activity]);
+
+    const currentGroup = currentGroupId ? groups.find(g => g.id === currentGroupId) || null : null;
 
     return (
         <UserContext.Provider value={{
             currentUser,
-            users: data.users,
-            holdings: data.holdings,
-            groups: data.groups,
-            activity: data.activity,
+            authUser,
+            users,
+            holdings,
+            groups,
+            activity,
             currentGroup,
             isLoading,
-            login,
-            logout,
+            isAuthenticated: !!authUser,
+            signUp,
+            signIn,
+            signOut,
             updateUser,
             addHolding,
             updateHolding,
@@ -362,6 +553,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
             getGroupMembers,
             addActivity,
             getGroupActivity,
+            refreshData,
         }}>
             {children}
         </UserContext.Provider>
