@@ -66,6 +66,10 @@ interface UserContextType {
     // User actions
     updateUser: (data: Partial<UserProfile>) => Promise<void>;
 
+    // Cash actions
+    depositCash: (amount: number) => Promise<void>;
+    withdrawCash: (amount: number) => Promise<void>;
+
     // Holdings actions
     addHolding: (holding: Omit<UserHolding, 'id' | 'userId' | 'createdAt'>) => Promise<UserHolding | null>;
     updateHolding: (id: string, data: Partial<UserHolding>) => Promise<void>;
@@ -332,6 +336,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
         await refreshData();
     };
 
+    // Deposit cash
+    const depositCash = async (amount: number) => {
+        if (!authUser || !currentUser) return;
+        const newBalance = currentUser.cashBalance + amount;
+        await updateUser({ cashBalance: newBalance });
+    };
+
+    // Withdraw cash
+    const withdrawCash = async (amount: number) => {
+        if (!authUser || !currentUser) return;
+        const newBalance = Math.max(0, currentUser.cashBalance - amount);
+        await updateUser({ cashBalance: newBalance });
+    };
+
     // Add holding
     const addHolding = async (holding: Omit<UserHolding, 'id' | 'userId' | 'createdAt'>): Promise<UserHolding | null> => {
         if (!authUser) return null;
@@ -541,6 +559,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
             signIn,
             signOut,
             updateUser,
+            depositCash,
+            withdrawCash,
             addHolding,
             updateHolding,
             deleteHolding,

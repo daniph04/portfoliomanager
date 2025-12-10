@@ -15,12 +15,17 @@ export default function LoginPage() {
     const [error, setError] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // If already authenticated, go to groups
+    // If already authenticated, check setup status
     useEffect(() => {
-        if (!isLoading && isAuthenticated) {
-            router.push("/groups");
+        if (!isLoading && isAuthenticated && currentUser) {
+            // Check if user has completed setup (has cash balance set or holdings)
+            if (currentUser.cashBalance > 0) {
+                router.push("/groups");
+            } else {
+                router.push("/setup");
+            }
         }
-    }, [isLoading, isAuthenticated, router]);
+    }, [isLoading, isAuthenticated, currentUser, router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -90,8 +95,8 @@ export default function LoginPage() {
                             type="button"
                             onClick={() => { setMode("login"); setError(""); }}
                             className={`flex-1 py-2.5 rounded-xl font-medium transition-all ${mode === "login"
-                                    ? "bg-emerald-600 text-white"
-                                    : "bg-slate-800 text-slate-400 hover:text-white"
+                                ? "bg-emerald-600 text-white"
+                                : "bg-slate-800 text-slate-400 hover:text-white"
                                 }`}
                         >
                             Sign In
@@ -100,8 +105,8 @@ export default function LoginPage() {
                             type="button"
                             onClick={() => { setMode("register"); setError(""); }}
                             className={`flex-1 py-2.5 rounded-xl font-medium transition-all ${mode === "register"
-                                    ? "bg-emerald-600 text-white"
-                                    : "bg-slate-800 text-slate-400 hover:text-white"
+                                ? "bg-emerald-600 text-white"
+                                : "bg-slate-800 text-slate-400 hover:text-white"
                                 }`}
                         >
                             Register

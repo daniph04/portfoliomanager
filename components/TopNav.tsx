@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { usePersistentGroupData } from "@/lib/useGroupData";
+import { useUser } from "@/lib/hooks/useUser";
 import { useRouter } from "next/navigation";
 
 interface TopNavProps {
@@ -20,45 +20,31 @@ const tabs = [
 
 export default function TopNav({ currentTab, onTabChange, groupName, currentProfileName }: TopNavProps) {
     const router = useRouter();
-    const { appState, session, helpers } = usePersistentGroupData();
+    const { groups, currentGroup, setCurrentGroup, signOut, currentUser } = useUser();
     const [showMenu, setShowMenu] = useState(false);
 
-    // Get all groups the user has access to (they've authenticated to)
-    const availableGroups = appState.groups;
-    const currentGroupId = session?.groupId;
-
-    const handleLogout = () => {
-        helpers.clearSession();
+    const handleLogout = async () => {
+        await signOut();
         router.push("/");
-    };
-
-    const handleSwitchProfile = () => {
-        const currentSession = JSON.parse(localStorage.getItem("portfolio_league_session") || "{}");
-        if (currentSession.groupId) {
-            helpers.setSession(currentSession.groupId, null);
-            router.push("/select-profile");
-        }
     };
 
     const handleSwitchGroup = (groupId: string) => {
-        helpers.setSession(groupId, null); // Clear profile, they'll need to select
+        setCurrentGroup(groupId);
         setShowMenu(false);
-        router.push("/select-profile");
     };
 
     const handleJoinNewGroup = () => {
-        helpers.clearSession();
         setShowMenu(false);
-        router.push("/");
+        router.push("/groups");
     };
 
     return (
         <>
-            {/* Top Header - Simplified for mobile */}
+            {/* Top Header */}
             <nav className="bg-slate-900/80 backdrop-blur-xl border-b border-slate-800 sticky top-0 z-40">
                 <div className="px-4 py-3">
                     <div className="flex items-center justify-between">
-                        {/* Left: App Name */}
+                        {/* Left: Group Name */}
                         <div className="flex items-center space-x-2 min-w-0 flex-1">
                             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
                                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -70,12 +56,9 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
                                     {groupName || "Portfolio League"}
                                 </h1>
                                 {currentProfileName && (
-                                    <button
-                                        onClick={handleSwitchProfile}
-                                        className="text-xs text-slate-500 hover:text-emerald-400 transition-colors truncate block"
-                                    >
+                                    <span className="text-xs text-slate-500 truncate block">
                                         {currentProfileName}
-                                    </button>
+                                    </span>
                                 )}
                             </div>
                         </div>
@@ -105,21 +88,31 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
                     {/* Menu */}
                     <div className="fixed top-14 right-4 w-64 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50">
                         <div className="py-2">
+                            {/* User Info */}
+                            {currentUser && (
+                                <div className="px-4 py-3 border-b border-slate-700">
+                                    <p className="text-sm font-medium text-slate-100">{currentUser.name}</p>
+                                    <p className="text-xs text-emerald-400">
+                                        Cash: ${currentUser.cashBalance.toLocaleString()}
+                                    </p>
+                                </div>
+                            )}
+
                             {/* Groups */}
                             <div className="px-4 py-2 text-xs text-slate-500 uppercase tracking-wider">
                                 Your Groups
                             </div>
-                            {availableGroups.map((group) => (
+                            {groups.map((group) => (
                                 <button
                                     key={group.id}
                                     onClick={() => handleSwitchGroup(group.id)}
-                                    className={`w-full px-4 py-2.5 text-left flex items-center justify-between hover:bg-slate-800 transition-colors ${group.id === currentGroupId
+                                    className={`w-full px-4 py-2.5 text-left flex items-center justify-between hover:bg-slate-800 transition-colors ${group.id === currentGroup?.id
                                         ? 'bg-emerald-500/10 text-emerald-400'
                                         : 'text-slate-300'
                                         }`}
                                 >
                                     <span className="font-medium">{group.name}</span>
-                                    {group.id === currentGroupId && (
+                                    {group.id === currentGroup?.id && (
                                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                         </svg>
@@ -159,7 +152,7 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
                 </>
             )}
 
-            {/* Bottom Tab Bar - Mobile Navigation */}
+            {/* Bottom Tab Bar */}
             <div className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-800 z-40 safe-area-bottom">
                 <div className="flex items-center justify-around py-2 px-2">
                     {tabs.map((tab) => (
