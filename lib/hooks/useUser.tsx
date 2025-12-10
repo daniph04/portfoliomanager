@@ -359,48 +359,28 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
     // Deposit cash
     const depositCash = async (amount: number) => {
-        if (!authUser || !currentUser || !currentGroupId) return;
+        if (!authUser || !currentUser) return;
         const newBalance = currentUser.cashBalance + amount;
         await updateUser({ cashBalance: newBalance });
 
-        // Show local notification
+        // Show local notification (only to self)
         if (shouldShowNotification('DEPOSIT')) {
             const notification = generateActivityNotification('DEPOSIT', currentUser.name, undefined, amount);
             showLocalNotification(notification);
         }
-
-        // Send push to other group members
-        const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-        sendPushToGroup(
-            currentGroupId,
-            authUser.id,
-            `${currentUser.name} deposited cash`,
-            `Added ${formattedAmount} to their portfolio`,
-            'DEPOSIT'
-        );
     };
 
     // Withdraw cash
     const withdrawCash = async (amount: number) => {
-        if (!authUser || !currentUser || !currentGroupId) return;
+        if (!authUser || !currentUser) return;
         const newBalance = Math.max(0, currentUser.cashBalance - amount);
         await updateUser({ cashBalance: newBalance });
 
-        // Show local notification
+        // Show local notification (only to self)
         if (shouldShowNotification('WITHDRAW')) {
             const notification = generateActivityNotification('WITHDRAW', currentUser.name, undefined, amount);
             showLocalNotification(notification);
         }
-
-        // Send push to other group members
-        const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-        sendPushToGroup(
-            currentGroupId,
-            authUser.id,
-            `${currentUser.name} withdrew cash`,
-            `Removed ${formattedAmount} from their portfolio`,
-            'WITHDRAW'
-        );
     };
 
     // Add holding

@@ -87,10 +87,10 @@ export default function NotificationBell() {
             <button
                 onClick={() => setShowPopup(!showPopup)}
                 className={`relative p-2 rounded-lg transition-all ${status === "enabled"
-                        ? "text-emerald-400 hover:bg-emerald-500/10"
-                        : status === "denied"
-                            ? "text-amber-400 hover:bg-amber-500/10"
-                            : "text-slate-400 hover:text-white hover:bg-slate-800"
+                    ? "text-emerald-400 hover:bg-emerald-500/10"
+                    : status === "denied"
+                        ? "text-amber-400 hover:bg-amber-500/10"
+                        : "text-slate-400 hover:text-white hover:bg-slate-800"
                     }`}
             >
                 {/* Bell icon */}
@@ -166,9 +166,6 @@ export default function NotificationBell() {
                                     </li>
                                     <li className="flex items-center gap-2">
                                         <span className="text-red-400">📉</span> Sell holdings
-                                    </li>
-                                    <li className="flex items-center gap-2">
-                                        <span className="text-cyan-400">💰</span> Deposit or withdraw cash
                                     </li>
                                     <li className="flex items-center gap-2">
                                         <span className="text-purple-400">👋</span> Join the group
