@@ -25,6 +25,9 @@ export default function HoldingFormModal({ open, mode, initialValues, availableC
         avgBuyPrice: 0,
         currentPrice: 0,
     });
+    // Raw string state for inputs to preserve comma/dot while typing
+    const [quantityStr, setQuantityStr] = useState("");
+    const [avgBuyPriceStr, setAvgBuyPriceStr] = useState("");
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [symbolSelected, setSymbolSelected] = useState(false);
     const [priceLoading, setPriceLoading] = useState(false);
@@ -35,6 +38,8 @@ export default function HoldingFormModal({ open, mode, initialValues, availableC
         if (open) {
             if (mode === "edit" && initialValues) {
                 setFormData(initialValues);
+                setQuantityStr(initialValues.quantity ? String(initialValues.quantity) : "");
+                setAvgBuyPriceStr(initialValues.avgBuyPrice ? String(initialValues.avgBuyPrice) : "");
                 setSymbolSelected(true);
             } else {
                 setFormData({
@@ -45,6 +50,8 @@ export default function HoldingFormModal({ open, mode, initialValues, availableC
                     avgBuyPrice: 0,
                     currentPrice: 0,
                 });
+                setQuantityStr("");
+                setAvgBuyPriceStr("");
                 setSymbolSelected(false);
             }
             setErrors({});
@@ -86,11 +93,49 @@ export default function HoldingFormModal({ open, mode, initialValues, availableC
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
-        if (validate()) {
+        // Parse string values first in case user didn't blur
+        const parsedQuantity = parseLocaleNumber(quantityStr);
+        const parsedAvgBuyPrice = parseLocaleNumber(avgBuyPriceStr);
+        setFormData(prev => ({
+            ...prev,
+            quantity: parsedQuantity,
+            avgBuyPrice: parsedAvgBuyPrice,
+        }));
+
+        // Create a temporary formData with parsed values for validation
+        const validationData = {
+            ...formData,
+            quantity: parsedQuantity,
+            avgBuyPrice: parsedAvgBuyPrice,
+        };
+
+        // Inline validation with parsed values
+        const newErrors: Record<string, string> = {};
+        if (!validationData.symbol.trim()) {
+            newErrors.symbol = "Symbol is required";
+        }
+        if (!validationData.name.trim()) {
+            newErrors.name = "Name is required";
+        }
+        if (parsedQuantity <= 0) {
+            newErrors.quantity = "Quantity must be greater than 0";
+        }
+        if (parsedAvgBuyPrice <= 0) {
+            newErrors.avgBuyPrice = "Average buy price must be greater than 0";
+        }
+        if (mode === "create" && availableCash !== undefined) {
+            const totalCost = parsedQuantity * parsedAvgBuyPrice;
+            if (totalCost > availableCash) {
+                newErrors.quantity = `Insufficient funds. Available: ${formatCurrency(availableCash)}`;
+            }
+        }
+        setErrors(newErrors);
+
+        if (Object.keys(newErrors).length === 0) {
             const finalData = {
-                ...formData,
-                symbol: formData.symbol.toUpperCase().trim(),
-                name: formData.name.trim(),
+                ...validationData,
+                symbol: validationData.symbol.toUpperCase().trim(),
+                name: validationData.name.trim(),
                 // Use avgBuyPrice as fallback if currentPrice is 0
                 currentPrice: formData.currentPrice > 0 ? formData.currentPrice : formData.avgBuyPrice,
             };
@@ -243,13 +288,19 @@ export default function HoldingFormModal({ open, mode, initialValues, availableC
                         <input
                             id="quantity"
                             type="text"
-                            inputMode="decimal"
-                            value={formData.quantity || ""}
-                            onChange={(e) => handleChange("quantity", parseLocaleNumber(e.target.value))}
-                            placeholder="10 (usa . o , para decimales)"
+                            inputMode="text"
+                            pattern="[0-9.,]*"
+                            value={quantityStr}
+                            onChange={(e) => setQuantityStr(e.target.value)}
+                            onBlur={() => {
+                                const parsed = parseLocaleNumber(quantityStr);
+                                setFormData(prev => ({ ...prev, quantity: parsed }));
+                            }}
+                            placeholder="10"
                             className={`w-full px-3 py-2.5 bg-slate-800 border ${errors.quantity ? "border-red-500" : "border-slate-700"
                                 } rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent`}
                         />
+                        <p className="text-xs text-slate-500 mt-1">Use . or , for decimals</p>
                         {errors.quantity && <p className="text-red-400 text-xs mt-1">{errors.quantity}</p>}
                     </div>
 
@@ -263,17 +314,22 @@ export default function HoldingFormModal({ open, mode, initialValues, availableC
                             <input
                                 id="avgBuyPrice"
                                 type="text"
-                                inputMode="decimal"
-                                value={formData.avgBuyPrice || ""}
-                                onChange={(e) => handleChange("avgBuyPrice", parseLocaleNumber(e.target.value))}
-                                placeholder="150.00 (use . or ,)"
+                                inputMode="text"
+                                pattern="[0-9.,]*"
+                                value={avgBuyPriceStr}
+                                onChange={(e) => setAvgBuyPriceStr(e.target.value)}
+                                onBlur={() => {
+                                    const parsed = parseLocaleNumber(avgBuyPriceStr);
+                                    setFormData(prev => ({ ...prev, avgBuyPrice: parsed }));
+                                }}
+                                placeholder="150.00"
                                 className={`w-full pl-8 pr-3 py-2.5 bg-slate-800 border ${errors.avgBuyPrice ? "border-red-500" : "border-slate-700"
                                     } rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent`}
                             />
                         </div>
                         {errors.avgBuyPrice && <p className="text-red-400 text-xs mt-1">{errors.avgBuyPrice}</p>}
                         <p className="text-xs text-slate-500 mt-1">
-                            The price you paid per share/unit
+                            Use . or , for decimals
                         </p>
                     </div>
 
