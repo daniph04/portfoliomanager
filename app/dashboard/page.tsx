@@ -8,6 +8,7 @@ import OverviewTab from "@/components/OverviewTab";
 import LeaderboardTab from "@/components/LeaderboardTab";
 import MembersTab from "@/components/MembersTab";
 import ActivityTab from "@/components/ActivityTab";
+import CashModal from "@/components/CashModal";
 import { GroupState, Member, Holding, ActivityEvent } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
 
@@ -17,6 +18,8 @@ export default function DashboardPage() {
     const router = useRouter();
     const [currentTab, setCurrentTab] = useState<TabType>("overview");
     const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+    const [cashModalOpen, setCashModalOpen] = useState(false);
+    const [cashModalMode, setCashModalMode] = useState<"deposit" | "withdraw">("deposit");
 
     const {
         currentUser,
@@ -30,6 +33,8 @@ export default function DashboardPage() {
         addHolding,
         updateHolding,
         deleteHolding,
+        depositCash,
+        withdrawCash,
         refreshData,
     } = useUser();
 
@@ -52,6 +57,24 @@ export default function DashboardPage() {
             }
         }
     }, [isLoading, users, selectedMemberId, currentUser]);
+
+    const handleOpenDeposit = () => {
+        setCashModalMode("deposit");
+        setCashModalOpen(true);
+    };
+
+    const handleOpenWithdraw = () => {
+        setCashModalMode("withdraw");
+        setCashModalOpen(true);
+    };
+
+    const handleCashConfirm = async (amount: number) => {
+        if (cashModalMode === "deposit") {
+            await depositCash(amount);
+        } else {
+            await withdrawCash(amount);
+        }
+    };
 
     // Adapt data to old GroupState format for compatibility with existing components
     const adaptedGroup: GroupState = {
@@ -139,6 +162,32 @@ export default function DashboardPage() {
             <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950" />
             <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-900/10 via-transparent to-transparent" />
 
+            {/* Cash Balance Bar */}
+            {currentUser && (
+                <div className="fixed top-16 left-0 right-0 z-30 bg-slate-900/90 backdrop-blur border-b border-slate-800">
+                    <div className="flex items-center justify-between px-4 py-2">
+                        <div className="flex items-center gap-2">
+                            <span className="text-slate-400 text-sm">Cash:</span>
+                            <span className="text-emerald-400 font-bold">${currentUser.cashBalance.toLocaleString()}</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleOpenDeposit}
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors"
+                            >
+                                + Deposit
+                            </button>
+                            <button
+                                onClick={handleOpenWithdraw}
+                                className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium rounded-lg transition-colors"
+                            >
+                                − Withdraw
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Main layout */}
             <div className="relative z-10 flex flex-col min-h-screen">
                 <TopNav
@@ -148,8 +197,8 @@ export default function DashboardPage() {
                     currentProfileName={currentUser?.name}
                 />
 
-                {/* Main content */}
-                <main className="flex-1 overflow-y-auto p-4">
+                {/* Main content - add top padding for cash bar */}
+                <main className="flex-1 overflow-y-auto p-4 pt-16">
                     {currentTab === "overview" && (
                         <OverviewTab group={adaptedGroup} helpers={adaptedHelpers as GroupDataHelpers} />
                     )}
@@ -170,6 +219,15 @@ export default function DashboardPage() {
                     )}
                 </main>
             </div>
+
+            {/* Cash Modal */}
+            <CashModal
+                isOpen={cashModalOpen}
+                mode={cashModalMode}
+                currentBalance={currentUser?.cashBalance || 0}
+                onClose={() => setCashModalOpen(false)}
+                onConfirm={handleCashConfirm}
+            />
         </div>
     );
 }
