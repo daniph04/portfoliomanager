@@ -22,6 +22,7 @@ interface MembersTabProps {
     onDeposit: () => void;
     onWithdraw: () => void;
     helpers: GroupDataHelpers;
+    readOnly?: boolean;
 }
 
 const ASSET_COLORS: Record<string, string> = {
@@ -31,7 +32,7 @@ const ASSET_COLORS: Record<string, string> = {
     OTHER: "#8E8E93",
 };
 
-export default function MembersTab({ group, selectedMemberId, currentProfileId, cashBalance, onSelectMember, onDeposit, onWithdraw, helpers }: MembersTabProps) {
+export default function MembersTab({ group, selectedMemberId, currentProfileId, cashBalance, onSelectMember, onDeposit, onWithdraw, helpers, readOnly = false }: MembersTabProps) {
     const [modalOpen, setModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<"create" | "edit">("create");
     const [editingHolding, setEditingHolding] = useState<Holding | null>(null);

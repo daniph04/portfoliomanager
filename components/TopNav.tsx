@@ -5,15 +5,16 @@ import { useUser } from "@/lib/hooks/useUser";
 import { useRouter } from "next/navigation";
 
 interface TopNavProps {
-    currentTab: "overview" | "leaderboard" | "members" | "activity";
-    onTabChange: (tab: "overview" | "leaderboard" | "members" | "activity") => void;
+    currentTab: "portfolio" | "overview" | "investors" | "leaderboard" | "activity";
+    onTabChange: (tab: "portfolio" | "overview" | "investors" | "leaderboard" | "activity") => void;
     groupName?: string;
     currentProfileName?: string;
 }
 
 const tabs = [
-    { id: "members" as const, label: "My Portfolio", icon: "👤" },
-    { id: "overview" as const, label: "Group", icon: "📊" },
+    { id: "portfolio" as const, label: "My Portfolio", icon: "👤" },
+    { id: "overview" as const, label: "Group Portfolio", icon: "📊" },
+    { id: "investors" as const, label: "Investors", icon: "👥" },
     { id: "leaderboard" as const, label: "Ranking", icon: "🏆" },
     { id: "activity" as const, label: "Activity", icon: "📈" },
 ];

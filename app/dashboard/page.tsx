@@ -7,16 +7,17 @@ import TopNav from "@/components/TopNav";
 import OverviewTab from "@/components/OverviewTab";
 import LeaderboardTab from "@/components/LeaderboardTab";
 import MembersTab from "@/components/MembersTab";
+import MyPortfolioTab from "@/components/MyPortfolioTab";
 import ActivityTab from "@/components/ActivityTab";
 import CashModal from "@/components/CashModal";
 import { GroupState, Member, Holding, ActivityEvent } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
 
-type TabType = "overview" | "leaderboard" | "members" | "activity";
+type TabType = "portfolio" | "overview" | "investors" | "leaderboard" | "activity";
 
 export default function DashboardPage() {
     const router = useRouter();
-    const [currentTab, setCurrentTab] = useState<TabType>("members");
+    const [currentTab, setCurrentTab] = useState<TabType>("portfolio");
     const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
     const [cashModalOpen, setCashModalOpen] = useState(false);
     const [cashModalMode, setCashModalMode] = useState<"deposit" | "withdraw">("deposit");
@@ -175,13 +176,20 @@ export default function DashboardPage() {
 
                 {/* Main content */}
                 <main className="flex-1 overflow-y-auto p-4">
+                    {currentTab === "portfolio" && (
+                        <MyPortfolioTab
+                            group={adaptedGroup}
+                            currentProfileId={currentUser?.id || ""}
+                            cashBalance={currentUser?.cashBalance || 0}
+                            onDeposit={handleOpenDeposit}
+                            onWithdraw={handleOpenWithdraw}
+                            helpers={adaptedHelpers as GroupDataHelpers}
+                        />
+                    )}
                     {currentTab === "overview" && (
                         <OverviewTab group={adaptedGroup} helpers={adaptedHelpers as GroupDataHelpers} />
                     )}
-                    {currentTab === "leaderboard" && (
-                        <LeaderboardTab group={adaptedGroup} />
-                    )}
-                    {currentTab === "members" && (
+                    {currentTab === "investors" && (
                         <MembersTab
                             group={adaptedGroup}
                             selectedMemberId={selectedMemberId}
@@ -191,7 +199,11 @@ export default function DashboardPage() {
                             onDeposit={handleOpenDeposit}
                             onWithdraw={handleOpenWithdraw}
                             helpers={adaptedHelpers as GroupDataHelpers}
+                            readOnly={true}
                         />
+                    )}
+                    {currentTab === "leaderboard" && (
+                        <LeaderboardTab group={adaptedGroup} />
                     )}
                     {currentTab === "activity" && (
                         <ActivityTab group={adaptedGroup} />
