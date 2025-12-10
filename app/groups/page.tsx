@@ -93,13 +93,13 @@ export default function GroupsPage() {
                     <h1 className="text-3xl font-bold text-slate-100">
                         Hey {currentUser?.name}! 👋
                     </h1>
-                    <p className="text-slate-400 mt-2">Únete o crea un grupo para empezar</p>
+                    <p className="text-slate-400 mt-2">Join or create a group to get started</p>
                 </div>
 
                 {/* Existing Groups */}
                 {userGroups.length > 0 && (
                     <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 mb-6">
-                        <h2 className="text-lg font-semibold text-slate-100 mb-4">Tus Grupos</h2>
+                        <h2 className="text-lg font-semibold text-slate-100 mb-4">Your Groups</h2>
                         <div className="space-y-2">
                             {userGroups.map((group) => (
                                 <button
@@ -126,7 +126,7 @@ export default function GroupsPage() {
                                 : "bg-slate-800 text-slate-400 hover:text-slate-200"
                                 }`}
                         >
-                            Unirse a Grupo
+                            Join Group
                         </button>
                         <button
                             onClick={() => { setMode("create"); setError(null); }}
@@ -135,33 +135,33 @@ export default function GroupsPage() {
                                 : "bg-slate-800 text-slate-400 hover:text-slate-200"
                                 }`}
                         >
-                            Crear Grupo
+                            Create Group
                         </button>
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">
-                                Nombre del Grupo
+                                Group Name
                             </label>
                             <input
                                 type="text"
                                 value={groupName}
                                 onChange={(e) => setGroupName(e.target.value)}
-                                placeholder={mode === "create" ? "Mi Grupo de Inversión" : "Nombre del grupo..."}
+                                placeholder={mode === "create" ? "My Investment Group" : "Group name..."}
                                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             />
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">
-                                Contraseña del Grupo
+                                Group Password
                             </label>
                             <input
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                placeholder={mode === "create" ? "Elige una contraseña" : "Contraseña..."}
+                                placeholder={mode === "create" ? "Choose a password" : "Password..."}
                                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             />
                         </div>
@@ -177,7 +177,7 @@ export default function GroupsPage() {
                             disabled={isSubmitting}
                             className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-semibold rounded-xl transition-all"
                         >
-                            {isSubmitting ? "Cargando..." : mode === "create" ? "Crear Grupo" : "Unirse al Grupo"}
+                            {isSubmitting ? "Loading..." : mode === "create" ? "Create Group" : "Join Group"}
                         </button>
                     </form>
                 </div>
@@ -188,7 +188,7 @@ export default function GroupsPage() {
                         onClick={handleLogout}
                         className="text-slate-500 hover:text-slate-300 text-sm transition-colors"
                     >
-                        Cerrar Sesión
+                        Sign Out
                     </button>
                 </div>
             </div>

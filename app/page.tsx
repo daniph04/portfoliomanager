@@ -37,7 +37,7 @@ export default function LoginPage() {
                 }
             } else {
                 if (!name.trim()) {
-                    setError("Por favor ingresa tu nombre");
+                    setError("Please enter your name");
                     setIsSubmitting(false);
                     return;
                 }
@@ -45,13 +45,12 @@ export default function LoginPage() {
                 if (error) {
                     setError(error);
                 } else {
-                    // Supabase might require email confirmation
-                    setError("¡Cuenta creada! Revisa tu email para confirmar o intenta iniciar sesión.");
+                    setError("Account created! Check your email to confirm or try signing in.");
                     setMode("login");
                 }
             }
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Error desconocido");
+            setError(err instanceof Error ? err.message : "Unknown error");
         } finally {
             setIsSubmitting(false);
         }
@@ -80,7 +79,7 @@ export default function LoginPage() {
                         </svg>
                     </div>
                     <h1 className="text-3xl font-bold text-slate-100">Portfolio League</h1>
-                    <p className="text-slate-400 mt-2">Compite con tus amigos</p>
+                    <p className="text-slate-400 mt-2">Compete with your friends</p>
                 </div>
 
                 {/* Login Card */}
@@ -95,7 +94,7 @@ export default function LoginPage() {
                                     : "bg-slate-800 text-slate-400 hover:text-white"
                                 }`}
                         >
-                            Iniciar Sesión
+                            Sign In
                         </button>
                         <button
                             type="button"
@@ -105,7 +104,7 @@ export default function LoginPage() {
                                     : "bg-slate-800 text-slate-400 hover:text-white"
                                 }`}
                         >
-                            Registrarse
+                            Register
                         </button>
                     </div>
 
@@ -113,13 +112,13 @@ export default function LoginPage() {
                         {mode === "register" && (
                             <div>
                                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                                    Tu nombre
+                                    Your Name
                                 </label>
                                 <input
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    placeholder="Cómo te llamas..."
+                                    placeholder="What's your name..."
                                     className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                                 />
                             </div>
@@ -133,14 +132,14 @@ export default function LoginPage() {
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                placeholder="tu@email.com"
+                                placeholder="you@email.com"
                                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                             />
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">
-                                Contraseña
+                                Password
                             </label>
                             <input
                                 type="password"
@@ -163,18 +162,18 @@ export default function LoginPage() {
                             className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/20"
                         >
                             {isSubmitting
-                                ? "Cargando..."
+                                ? "Loading..."
                                 : mode === "register"
-                                    ? "Crear Cuenta"
-                                    : "Entrar"
+                                    ? "Create Account"
+                                    : "Sign In"
                             }
                         </button>
                     </form>
 
                     <p className="text-center text-slate-500 text-sm mt-6">
                         {mode === "login"
-                            ? "¿No tienes cuenta? Regístrate arriba"
-                            : "La contraseña debe tener al menos 6 caracteres"
+                            ? "Don't have an account? Register above"
+                            : "Password must be at least 6 characters"
                         }
                     </p>
                 </div>
