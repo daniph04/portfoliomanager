@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { SupabaseClient, User } from '@supabase/supabase-js';
+import { showLocalNotification, generateActivityNotification, shouldShowNotification } from '@/lib/notifications';
 
 // Types
 export interface UserProfile {
@@ -341,6 +342,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (!authUser || !currentUser) return;
         const newBalance = currentUser.cashBalance + amount;
         await updateUser({ cashBalance: newBalance });
+
+        // Show notification
+        if (shouldShowNotification('DEPOSIT')) {
+            const notification = generateActivityNotification('DEPOSIT', currentUser.name, undefined, amount);
+            showLocalNotification(notification);
+        }
     };
 
     // Withdraw cash
@@ -348,6 +355,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (!authUser || !currentUser) return;
         const newBalance = Math.max(0, currentUser.cashBalance - amount);
         await updateUser({ cashBalance: newBalance });
+
+        // Show notification
+        if (shouldShowNotification('WITHDRAW')) {
+            const notification = generateActivityNotification('WITHDRAW', currentUser.name, undefined, amount);
+            showLocalNotification(notification);
+        }
     };
 
     // Add holding
@@ -374,6 +387,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
             return null;
         }
 
+        // Show notification
+        if (shouldShowNotification('BUY') && data) {
+            const totalCost = holding.quantity * holding.avgBuyPrice;
+            const notification = generateActivityNotification('BUY', currentUser?.name || 'You', holding.symbol, totalCost);
+            showLocalNotification(notification);
+        }
+
         await refreshData();
         return data ? toAppHolding(data) : null;
     };
@@ -393,9 +413,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
         await refreshData();
     };
 
-    // Delete holding
+    // Delete holding (sell)
     const deleteHolding = async (id: string) => {
+        // Find the holding to get symbol for notification
+        const holdingToSell = holdings.find(h => h.id === id);
+
         await supabase.from('user_holdings').delete().eq('id', id);
+
+        // Show notification
+        if (shouldShowNotification('SELL') && holdingToSell) {
+            const totalValue = holdingToSell.quantity * holdingToSell.currentPrice;
+            const notification = generateActivityNotification('SELL', currentUser?.name || 'You', holdingToSell.symbol, totalValue);
+            showLocalNotification(notification);
+        }
+
         await refreshData();
     };
 

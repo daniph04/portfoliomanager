@@ -5,6 +5,7 @@ import { GroupState, Holding } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
 import { formatCurrency, formatPercent, getMemberColor, getHoldingPnl, getHoldingPnlPercent, getTotalCostBasis, getMemberHoldings, getTotalPortfolioValue } from "@/lib/utils";
 import HoldingFormModal from "./HoldingFormModal";
+import NotificationSettings from "./NotificationSettings";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 interface MyPortfolioTabProps {
@@ -264,6 +265,9 @@ export default function MyPortfolioTab({
                     </div>
                 )}
             </div>
+
+            {/* Notification Settings */}
+            <NotificationSettings />
 
             {/* Holding Modal */}
             <HoldingFormModal
