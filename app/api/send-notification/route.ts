@@ -1,15 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import * as admin from 'firebase-admin';
 
-// This API sends push notifications to all group members except the sender
-// Called when someone buys, sells, deposits, withdraws, or joins
+// Initialize Firebase Admin SDK (singleton pattern)
+const initFirebaseAdmin = () => {
+    if (admin.apps.length > 0) {
+        return admin.apps[0];
+    }
+
+    // Check for required environment variables
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+    if (!projectId || !clientEmail || !privateKey) {
+        console.log('Firebase Admin SDK not configured - missing env vars');
+        return null;
+    }
+
+    try {
+        return admin.initializeApp({
+            credential: admin.credential.cert({
+                projectId,
+                clientEmail,
+                privateKey,
+            }),
+        });
+    } catch (error) {
+        console.error('Failed to initialize Firebase Admin:', error);
+        return null;
+    }
+};
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 interface NotificationPayload {
     groupId: string;
-    senderId: string;  // Who triggered the action (will be excluded from notifications)
+    senderId: string;
     title: string;
     body: string;
     type: 'BUY' | 'SELL' | 'DEPOSIT' | 'WITHDRAW' | 'JOIN';
@@ -32,7 +60,7 @@ export async function POST(request: NextRequest) {
             .from('fcm_tokens')
             .select('token, user_id')
             .eq('group_id', groupId)
-            .neq('user_id', senderId);  // Exclude sender
+            .neq('user_id', senderId);
 
         if (tokensError) {
             console.error('Error fetching tokens:', tokensError);
@@ -43,56 +71,54 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ success: true, sent: 0, message: 'No recipients' });
         }
 
-        // Send notifications via FCM HTTP v1 API
-        // Note: For production, you'd use Firebase Admin SDK
-        // This is a simplified version using the legacy HTTP API
-        const fcmServerKey = process.env.FCM_SERVER_KEY;
-
-        if (!fcmServerKey) {
-            console.log('FCM_SERVER_KEY not configured, skipping push');
+        // Initialize Firebase Admin
+        const firebaseApp = initFirebaseAdmin();
+        if (!firebaseApp) {
+            console.log('Firebase Admin not configured, notifications logged only');
             return NextResponse.json({
                 success: true,
                 sent: 0,
-                message: 'FCM not configured - notifications logged only'
+                message: 'Firebase not configured'
             });
         }
 
         let sentCount = 0;
         const errors: string[] = [];
 
+        // Send to each token using FCM V1 API
         for (const { token } of tokens) {
             try {
-                const response = await fetch('https://fcm.googleapis.com/fcm/send', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `key=${fcmServerKey}`,
-                        'Content-Type': 'application/json',
+                await admin.messaging().send({
+                    token,
+                    notification: {
+                        title,
+                        body,
                     },
-                    body: JSON.stringify({
-                        to: token,
+                    webpush: {
                         notification: {
-                            title,
-                            body,
                             icon: '/icon-192.png',
-                            click_action: `${process.env.NEXT_PUBLIC_APP_URL || 'https://portfoliomanager.vercel.app'}/dashboard`,
+                            badge: '/icon-192.png',
                         },
-                        data: {
-                            type,
-                            symbol,
-                            groupId,
-                            senderId,
+                        fcmOptions: {
+                            link: `${process.env.NEXT_PUBLIC_APP_URL || 'https://portfoliomanager.vercel.app'}/dashboard`,
                         },
-                    }),
+                    },
+                    data: {
+                        type,
+                        symbol: symbol || '',
+                        groupId,
+                        senderId,
+                    },
                 });
-
-                if (response.ok) {
-                    sentCount++;
-                } else {
-                    const errorText = await response.text();
-                    errors.push(errorText);
+                sentCount++;
+            } catch (err: any) {
+                // If token is invalid, we should remove it from the database
+                if (err.code === 'messaging/invalid-registration-token' ||
+                    err.code === 'messaging/registration-token-not-registered') {
+                    await supabase.from('fcm_tokens').delete().eq('token', token);
+                    console.log('Removed invalid token:', token.substring(0, 20) + '...');
                 }
-            } catch (err) {
-                errors.push(String(err));
+                errors.push(err.message || String(err));
             }
         }
 
