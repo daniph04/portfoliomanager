@@ -135,6 +135,8 @@ export default function PerformanceChart({
                             hide
                         />
                         <YAxis
+                            dataKey={showPercentage ? "pct" : "value"}
+                            domain={['auto', 'auto']}
                             tickFormatter={(value) => showPercentage ? `${value.toFixed(1)}%` : formatCurrency(value, 0)}
                             width={showPercentage ? 60 : 70}
                             tick={{ fill: "#94a3b8", fontSize: 11 }}

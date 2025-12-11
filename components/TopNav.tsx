@@ -23,8 +23,8 @@ const tabs = [
 export default function TopNav({ currentTab, onTabChange, groupName, currentProfileName }: TopNavProps) {
     const router = useRouter();
     const { groups, currentGroup, setCurrentGroup, signOut, currentUser } = useUser();
-    const [showGroupMenu, setShowGroupMenu] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const [switchGroupSheetOpen, setSwitchGroupSheetOpen] = useState(false);
 
     const handleLogout = async () => {
         await signOut();
@@ -33,7 +33,7 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
 
     const handleSwitchGroup = (groupId: string) => {
         setCurrentGroup(groupId);
-        setShowGroupMenu(false);
+        setSwitchGroupSheetOpen(false);
     };
 
     return (
@@ -42,19 +42,13 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
             <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/5 bg-slate-900/80 safe-area-top">
                 <div className="px-4 h-16 flex items-center justify-between">
                     {/* Brand / Group Name */}
-                    <button
-                        onClick={() => setShowGroupMenu(true)}
-                        className="flex items-center gap-3 active:opacity-75 transition-opacity"
-                    >
+                    <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20">
                             <span className="text-white font-bold text-lg">P</span>
                         </div>
                         <div className="text-left">
-                            <h1 className="text-sm font-bold text-slate-100 flex items-center gap-1.5">
+                            <h1 className="text-sm font-bold text-slate-100">
                                 {groupName || "Portfolio League"}
-                                <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                                </svg>
                             </h1>
                             {currentProfileName && (
                                 <p className="text-[11px] text-emerald-400 font-medium tracking-wide uppercase">
@@ -62,7 +56,7 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
                                 </p>
                             )}
                         </div>
-                    </button>
+                    </div>
 
                     {/* Actions */}
                     <div className="flex items-center gap-1">
@@ -81,34 +75,6 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
             {/* Spacer for fixed header */}
             <div className="h-20" />
 
-            {/* Group Switcher Menu */}
-            {showGroupMenu && (
-                <>
-                    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowGroupMenu(false)} />
-                    <div className="fixed inset-x-0 bottom-0 z-50 bg-slate-900 rounded-t-2xl border-t border-slate-800 p-6 animate-slide-up safe-area-bottom">
-                        <div className="w-12 h-1 bg-slate-700 rounded-full mx-auto mb-6" />
-
-                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Switch Group</h3>
-                        <div className="space-y-2">
-                            {groups.map((group) => (
-                                <button
-                                    key={group.id}
-                                    onClick={() => handleSwitchGroup(group.id)}
-                                    className={`w-full p-4 rounded-xl flex items-center justify-between transition-all ${group.id === currentGroup?.id
-                                        ? "bg-emerald-500/10 border border-emerald-500/50 text-white shadow-[0_0_15px_rgba(16,185,129,0.2)]"
-                                        : "bg-slate-800/50 border border-transparent text-slate-400 hover:bg-slate-800"
-                                        }`}
-                                >
-                                    <span className="font-semibold">{group.name}</span>
-                                    {group.id === currentGroup?.id && (
-                                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
-                                    )}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </>
-            )}
 
             {/* Profile Menu */}
             {showProfileMenu && (
@@ -129,9 +95,8 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
 
                         <div className="space-y-2">
                             <button
-                                onClick={() => { setShowProfileMenu(false); setShowGroupMenu(true); }}
-                                className="w-full p-4 bg-slate-800/50 hover:bg-slate-800 rounded-xl text-slate-300 text-left font-medium transition-colors flex items-center gap-3"
-                            >
+                                onClick={() => { setShowProfileMenu(false); setSwitchGroupSheetOpen(true); }}
+                                className="w-full p-4 bg-slate-800/50 hover:bg-slate-800 rounded-xl text-slate-300 text-left font-medium transition-colors flex items-center gap-3">
                                 <span className="text-lg">🔄</span>
                                 Switch Group
                             </button>
@@ -149,6 +114,35 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
                                 <span className="text-lg">🚪</span>
                                 Log Out
                             </button>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Switch Group Sheet */}
+            {switchGroupSheetOpen && (
+                <>
+                    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setSwitchGroupSheetOpen(false)} />
+                    <div className="fixed inset-x-0 bottom-0 z-50 bg-slate-900 rounded-t-2xl border-t border-slate-800 p-6 animate-slide-up safe-area-bottom">
+                        <div className="w-12 h-1 bg-slate-700 rounded-full mx-auto mb-6" />
+
+                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Switch Group</h3>
+                        <div className="space-y-2">
+                            {groups.map((group) => (
+                                <button
+                                    key={group.id}
+                                    onClick={() => handleSwitchGroup(group.id)}
+                                    className={`w-full p-4 rounded-xl flex items-center justify-between transition-all ${group.id === currentGroup?.id
+                                        ? "bg-emerald-500/10 border border-emerald-500/50 text-white shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                                        : "bg-slate-800/50 border border-transparent text-slate-400 hover:bg-slate-800"
+                                        }`}
+                                >
+                                    <span className="font-semibold">{group.name}</span>
+                                    {group.id === currentGroup?.id && (
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
+                                    )}
+                                </button>
+                            ))}
                         </div>
                     </div>
                 </>

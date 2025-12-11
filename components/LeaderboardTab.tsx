@@ -19,13 +19,15 @@ interface LeaderboardTabProps {
 
 export default function LeaderboardTab({
     group,
-    currentSeason,
     isLeader = false,
     onStartSeason,
     onEndSeason,
 }: LeaderboardTabProps) {
     const [rankingMode, setRankingMode] = useState<RankingMode>("allTime");
     const [chartTimeframe, setChartTimeframe] = useState<Timeframe>("1M");
+
+    // Derive current season from group state
+    const currentSeason = group.currentSeasonId && group.seasons.find(s => s.id === group.currentSeasonId) || null;
 
     const rankings = useMemo(() => {
         return group.members.map(member => {

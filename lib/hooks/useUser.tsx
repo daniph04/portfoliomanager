@@ -368,6 +368,18 @@ export function UserProvider({ children }: { children: ReactNode }) {
             const notification = generateActivityNotification('DEPOSIT', currentUser.name, undefined, amount);
             showLocalNotification(notification);
         }
+
+        // Add activity event
+        if (currentGroupId) {
+            await addActivity(
+                currentGroupId,
+                'DEPOSIT',
+                `Deposited $${amount.toLocaleString()}`,
+                'Added cash to portfolio',
+                undefined,
+                amount
+            );
+        }
     };
 
     // Withdraw cash
@@ -380,6 +392,18 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (shouldShowNotification('WITHDRAW')) {
             const notification = generateActivityNotification('WITHDRAW', currentUser.name, undefined, amount);
             showLocalNotification(notification);
+        }
+
+        // Add activity event
+        if (currentGroupId) {
+            await addActivity(
+                currentGroupId,
+                'WITHDRAW',
+                `Withdrew $${amount.toLocaleString()}`,
+                'Removed cash from portfolio',
+                undefined,
+                -amount
+            );
         }
     };
 
@@ -428,6 +452,19 @@ export function UserProvider({ children }: { children: ReactNode }) {
             );
         }
 
+        // Add activity event
+        if (currentGroupId && data) {
+            const totalCost = holding.quantity * holding.avgBuyPrice;
+            await addActivity(
+                currentGroupId,
+                'BUY',
+                `Bought ${holding.symbol}`,
+                `Bought ${holding.quantity} at $${holding.avgBuyPrice.toFixed(2)} (total: $${totalCost.toLocaleString()})`,
+                holding.symbol,
+                -totalCost
+            );
+        }
+
         await refreshData();
         return data ? toAppHolding(data) : null;
     };
@@ -472,6 +509,21 @@ export function UserProvider({ children }: { children: ReactNode }) {
                 `Closed position worth ${formattedAmount}`,
                 'SELL',
                 holdingToSell.symbol
+            );
+        }
+
+        // Add activity event
+        if (currentGroupId && holdingToSell) {
+            const totalValue = holdingToSell.quantity * holdingToSell.currentPrice;
+            const costBasis = holdingToSell.quantity * holdingToSell.avgBuyPrice;
+            const realizedPL = totalValue - costBasis;
+            await addActivity(
+                currentGroupId,
+                'SELL',
+                `Sold ${holdingToSell.symbol}`,
+                `Sold ${holdingToSell.quantity} at $${holdingToSell.currentPrice.toFixed(2)}. P/L: ${realizedPL >= 0 ? '+' : ''}$${realizedPL.toFixed(2)}`,
+                holdingToSell.symbol,
+                realizedPL
             );
         }
 

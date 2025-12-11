@@ -6,6 +6,7 @@ import { GroupDataHelpers } from "@/lib/useGroupData";
 import { formatCurrency, formatPercent, getMemberColor, getHoldingPnl, getHoldingPnlPercent, getTotalCostBasis, getMemberHoldings, getTotalPortfolioValue } from "@/lib/utils";
 import { getMetricsForMode, MetricsMode } from "@/lib/portfolioMath";
 import HoldingFormModal from "./HoldingFormModal";
+import SellConfirmModal from "./SellConfirmModal";
 import DonutChart from "./DonutChart";
 import PerformanceChart from "./PerformanceChart";
 import { ASSET_COLORS } from "@/lib/theme";
@@ -30,6 +31,8 @@ export default function MyPortfolioTab({
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<"create" | "edit">("create");
     const [editingHolding, setEditingHolding] = useState<Holding | null>(null);
+    const [sellModalOpen, setSellModalOpen] = useState(false);
+    const [sellingHolding, setSellingHolding] = useState<Holding | null>(null);
     const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
     const [displayMode, setDisplayMode] = useState<MetricsMode>("allTime");
 
@@ -343,8 +346,7 @@ export default function MyPortfolioTab({
                                 return (
                                     <div
                                         key={holding.id}
-                                        onClick={() => handleEditHolding(holding)}
-                                        className="group bg-slate-900/50 border border-white/5 hover:border-white/10 rounded-2xl p-4 transition-all hover:bg-slate-800/50 cursor-pointer active:scale-[0.99]"
+                                        className="group bg-slate-900/50 border border-white/5 hover:border-white/10 rounded-2xl p-4 transition-all hover:bg-slate-800/50"
                                     >
                                         <div className="flex items-start justify-between">
                                             <div className="flex items-center gap-4">
@@ -383,6 +385,26 @@ export default function MyPortfolioTab({
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {/* Action buttons */}
+                                        <div className="mt-3 pt-3 border-t border-white/5 flex gap-2">
+                                            <button
+                                                onClick={() => handleEditHolding(holding)}
+                                                className="flex-1 px-3 py-2 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 rounded-lg text-sm font-medium transition-colors"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSellingHolding(holding);
+                                                    setSellModalOpen(true);
+                                                }}
+                                                className="flex-1 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-sm font-medium transition-colors"
+                                            >
+                                                Sell
+                                            </button>
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -407,6 +429,23 @@ export default function MyPortfolioTab({
                 availableCash={cashBalance}
                 onClose={() => setIsModalOpen(false)}
                 onSubmit={handleSubmit}
+            />
+
+            {/* Sell Modal */}
+            <SellConfirmModal
+                open={sellModalOpen}
+                holding={sellingHolding}
+                onClose={() => {
+                    setSellModalOpen(false);
+                    setSellingHolding(null);
+                }}
+                onConfirm={async (sellPrice: number) => {
+                    if (sellingHolding) {
+                        await helpers.sellHolding(sellingHolding.id, { sellPrice });
+                        setSellModalOpen(false);
+                        setSellingHolding(null);
+                    }
+                }}
             />
         </div>
     );

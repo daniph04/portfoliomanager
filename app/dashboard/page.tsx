@@ -10,8 +10,9 @@ import MembersTab from "@/components/MembersTab";
 import MyPortfolioTab from "@/components/MyPortfolioTab";
 import ActivityTab from "@/components/ActivityTab";
 import CashModal from "@/components/CashModal";
-import { GroupState, Member, Holding, ActivityEvent } from "@/lib/types";
+import { GroupState, Member, Holding, ActivityEvent, Season } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
+import { getTotalPortfolioValue } from "@/lib/utils";
 
 type TabType = "portfolio" | "overview" | "investors" | "leaderboard" | "activity";
 
@@ -38,6 +39,33 @@ export default function DashboardPage() {
         withdrawCash,
         refreshData,
     } = useUser();
+
+    // Client-side seasons state (persisted in localStorage since Supabase doesn't have seasons table yet)
+    const [seasons, setSeasons] = useState<Season[]>([]);
+    const [currentSeasonId, setCurrentSeasonId] = useState<string | undefined>(undefined);
+
+    // Load seasons from localStorage
+    useEffect(() => {
+        if (!currentGroup?.id) return;
+        const storageKey = `seasons_${currentGroup.id}`;
+        const stored = localStorage.getItem(storageKey);
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                setSeasons(parsed.seasons || []);
+                setCurrentSeasonId(parsed.currentSeasonId);
+            } catch (e) {
+                console.error("Failed to parse seasons from localStorage", e);
+            }
+        }
+    }, [currentGroup?.id]);
+
+    // Save seasons to localStorage whenever they change
+    useEffect(() => {
+        if (!currentGroup?.id) return;
+        const storageKey = `seasons_${currentGroup.id}`;
+        localStorage.setItem(storageKey, JSON.stringify({ seasons, currentSeasonId }));
+    }, [seasons, currentSeasonId, currentGroup?.id]);
 
     // Redirect if not authenticated or no group
     useEffect(() => {
@@ -111,9 +139,42 @@ export default function DashboardPage() {
             amountChangeUsd: a.amountChangeUsd,
         })),
         portfolioHistory: [],
-        seasons: [],
-        leaderId: undefined,
-        currentSeasonId: undefined,
+        seasons: seasons,
+        leaderId: currentGroup?.createdBy,
+        currentSeasonId: currentSeasonId,
+    };
+
+    // Season handlers
+    const handleStartSeason = () => {
+        if (!currentGroup || !currentUser) return;
+
+        const seasonNumber = seasons.length + 1;
+        const newSeason: Season = {
+            id: `season_${seasonNumber}`,
+            name: `Season ${seasonNumber}`,
+            startTime: new Date().toISOString(),
+            leaderId: currentUser.id,
+            memberSnapshots: {},
+        };
+
+        // Capture each member's current portfolio value as their season starting point
+        users.forEach(user => {
+            const userHoldings = holdings.filter(h => h.userId === user.id);
+            const holdingsValue = userHoldings.reduce((sum, h) => sum + (h.quantity * h.currentPrice), 0);
+            const portfolioValue = holdingsValue + user.cashBalance;
+            newSeason.memberSnapshots[user.id] = portfolioValue;
+        });
+
+        setSeasons([...seasons, newSeason]);
+        setCurrentSeasonId(newSeason.id);
+
+        // Add activity event (using addActivity from useUser which already exists)
+        // We'll need to add this to the activity manually since it's a group-level event
+        // For now, this will be handled when we verify the implementation
+    };
+
+    const handleEndSeason = () => {
+        setCurrentSeasonId(undefined);
     };
 
     // Adapt helpers to work with Supabase (cast to any to handle async differences)
@@ -206,7 +267,12 @@ export default function DashboardPage() {
                         />
                     )}
                     {currentTab === "leaderboard" && (
-                        <LeaderboardTab group={adaptedGroup} />
+                        <LeaderboardTab
+                            group={adaptedGroup}
+                            isLeader={currentUser?.id === adaptedGroup.leaderId}
+                            onStartSeason={handleStartSeason}
+                            onEndSeason={handleEndSeason}
+                        />
                     )}
                     {currentTab === "activity" && (
                         <ActivityTab group={adaptedGroup} />
