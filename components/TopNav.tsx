@@ -14,10 +14,10 @@ interface TopNavProps {
 
 const tabs = [
     { id: "portfolio" as const, label: "My Portfolio", icon: "👤" },
-    { id: "overview" as const, label: "Group Portfolio", icon: "📊" },
+    { id: "overview" as const, label: "Group", icon: "📊" },
     { id: "investors" as const, label: "Investors", icon: "👥" },
     { id: "leaderboard" as const, label: "Ranking", icon: "🏆" },
-    { id: "activity" as const, label: "Activity", icon: "📈" },
+    { id: "activity" as const, label: "Activity", icon: "⚡" },
 ];
 
 export default function TopNav({ currentTab, onTabChange, groupName, currentProfileName }: TopNavProps) {
@@ -35,178 +35,120 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
         setShowMenu(false);
     };
 
-    const handleJoinNewGroup = () => {
-        setShowMenu(false);
-        router.push("/groups");
-    };
-
     return (
         <>
-            {/* Top Header - Premium Glass Effect */}
-            <nav className="glass sticky top-0 z-40 border-b border-white/5">
-                <div className="px-4 py-3">
-                    <div className="flex items-center justify-between">
-                        {/* Left: Group Name with enhanced styling */}
-                        <div className="flex items-center space-x-3 min-w-0 flex-1">
-                            {/* Animated logo */}
-                            <div className="relative">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 via-cyan-500 to-emerald-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/20">
-                                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                                    </svg>
-                                </div>
-                                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 blur-lg opacity-30 animate-pulse" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <h1 className="text-lg font-bold gradient-text truncate">
-                                    {groupName || "Portfolio League"}
-                                </h1>
-                                {currentProfileName && (
-                                    <span className="text-xs text-slate-400 truncate block font-medium">
-                                        {currentProfileName}
-                                    </span>
-                                )}
-                            </div>
+            {/* Top Navigation Bar */}
+            <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/5 bg-slate-900/80 safe-area-top">
+                <div className="px-4 h-16 flex items-center justify-between">
+                    {/* Brand / Group Selector */}
+                    <button
+                        onClick={() => setShowMenu(true)}
+                        className="flex items-center gap-3 active:opacity-75 transition-opacity"
+                    >
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                            <span className="text-white font-bold text-lg">P</span>
                         </div>
-
-                        {/* Right: Notification Bell + Menu button */}
-                        <div className="flex items-center gap-2">
-                            <NotificationBell />
-                            <button
-                                onClick={() => setShowMenu(!showMenu)}
-                                className="p-2.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all duration-200 flex-shrink-0"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                        <div className="text-left">
+                            <h1 className="text-sm font-bold text-slate-100 flex items-center gap-1.5">
+                                {groupName || "Portfolio League"}
+                                <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                                 </svg>
-                            </button>
+                            </h1>
+                            {currentProfileName && (
+                                <p className="text-[11px] text-emerald-400 font-medium tracking-wide uppercase">
+                                    {currentProfileName}
+                                </p>
+                            )}
+                        </div>
+                    </button>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1">
+                        <NotificationBell />
+                        <div className="w-px h-6 bg-slate-800 mx-2" />
+                        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-medium text-slate-400">
+                            {currentUser?.name?.charAt(0) || "U"}
                         </div>
                     </div>
                 </div>
             </nav>
 
-            {/* Dropdown Menu */}
+            {/* Spacer for fixed header */}
+            <div className="h-20" />
+
+            {/* Mobile Menu Bottom Sheet */}
             {showMenu && (
                 <>
-                    {/* Backdrop */}
-                    <div
-                        className="fixed inset-0 z-40 bg-black/50"
-                        onClick={() => setShowMenu(false)}
-                    />
+                    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowMenu(false)} />
+                    <div className="fixed inset-x-0 bottom-0 z-50 bg-slate-900 rounded-t-2xl border-t border-slate-800 p-6 animate-slide-up safe-area-bottom">
+                        <div className="w-12 h-1 bg-slate-700 rounded-full mx-auto mb-6" />
 
-                    {/* Bottom Sheet Menu - Mobile Friendly */}
-                    <div
-                        className="fixed inset-x-0 bottom-0 z-50 transform transition-transform duration-300 ease-out"
-                        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-                    >
-                        <div className="bg-slate-900 border-t border-white/10 rounded-t-3xl shadow-2xl max-h-[70vh] overflow-y-auto">
-                            {/* Handle */}
-                            <div className="flex justify-center pt-3 pb-2">
-                                <div className="w-10 h-1 rounded-full bg-slate-600" />
-                            </div>
+                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Switch Group</h3>
+                        <div className="space-y-2 mb-6">
+                            {groups.map((group) => (
+                                <button
+                                    key={group.id}
+                                    onClick={() => handleSwitchGroup(group.id)}
+                                    className={`w-full p-4 rounded-xl flex items-center justify-between transition-all ${group.id === currentGroup?.id
+                                            ? "bg-emerald-500/10 border border-emerald-500/50 text-white shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                                            : "bg-slate-800/50 border border-transparent text-slate-400 hover:bg-slate-800"
+                                        }`}
+                                >
+                                    <span className="font-semibold">{group.name}</span>
+                                    {group.id === currentGroup?.id && (
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
+                                    )}
+                                </button>
+                            ))}
+                        </div>
 
-                            <div className="px-4 pb-4">
-                                {/* User Info */}
-                                {currentUser && (
-                                    <div className="bg-white/5 rounded-xl p-4 mb-4">
-                                        <p className="text-lg font-semibold text-white">{currentUser.name}</p>
-                                        <p className="text-sm text-emerald-400">
-                                            Cash: ${currentUser.cashBalance.toLocaleString()}
-                                        </p>
-                                    </div>
-                                )}
-
-                                {/* Groups */}
-                                <div className="mb-4">
-                                    <div className="text-xs text-slate-500 uppercase tracking-wider mb-2 px-1">
-                                        Your Groups
-                                    </div>
-                                    <div className="space-y-1">
-                                        {groups.map((group) => (
-                                            <button
-                                                key={group.id}
-                                                onClick={() => handleSwitchGroup(group.id)}
-                                                className={`w-full px-4 py-3 text-left flex items-center justify-between rounded-xl transition-colors ${group.id === currentGroup?.id
-                                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                                                    : 'bg-white/5 text-slate-300 hover:bg-white/10'
-                                                    }`}
-                                            >
-                                                <span className="font-medium">{group.name}</span>
-                                                {group.id === currentGroup?.id && (
-                                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                    </svg>
-                                                )}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Actions */}
-                                <div className="space-y-2">
-                                    <button
-                                        onClick={handleJoinNewGroup}
-                                        className="w-full px-4 py-3.5 text-left text-slate-300 bg-white/5 hover:bg-white/10 rounded-xl transition-colors flex items-center gap-3"
-                                    >
-                                        <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                        </svg>
-                                        Join or Create Group
-                                    </button>
-
-                                    <button
-                                        onClick={handleLogout}
-                                        className="w-full px-4 py-3.5 text-left text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded-xl transition-colors flex items-center gap-3"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                                        </svg>
-                                        Logout
-                                    </button>
-                                </div>
-                            </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={() => { setShowMenu(false); router.push("/groups"); }}
+                                className="p-3 bg-slate-800 rounded-xl text-slate-300 text-sm font-medium hover:bg-slate-700 transition-colors"
+                            >
+                                + New Group
+                            </button>
+                            <button
+                                onClick={handleLogout}
+                                className="p-3 bg-red-500/10 text-red-400 rounded-xl text-sm font-medium hover:bg-red-500/20 transition-colors"
+                            >
+                                Log Out
+                            </button>
                         </div>
                     </div>
                 </>
             )}
 
-            {/* Bottom Tab Bar - Premium Glass */}
-            <div className="fixed bottom-0 left-0 right-0 glass border-t border-white/5 z-40 safe-area-bottom">
-                <div className="flex items-center justify-around py-2 px-1">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => onTabChange(tab.id)}
-                            className={`relative flex flex-col items-center justify-center py-2 px-2 rounded-xl transition-all duration-300 min-w-0 flex-1 ${currentTab === tab.id
-                                ? "text-emerald-400"
-                                : "text-slate-500 hover:text-slate-400"
-                                }`}
-                        >
-                            {/* Active indicator line */}
-                            {currentTab === tab.id && (
-                                <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-1 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500" />
-                            )}
-
-                            {/* Icon with glow when active */}
-                            <div className={`text-xl mb-0.5 transition-transform duration-300 ${currentTab === tab.id ? 'scale-110' : ''}`}>
-                                {tab.icon}
-                            </div>
-
-                            <span className={`text-[10px] font-semibold truncate transition-all ${currentTab === tab.id
-                                ? 'text-emerald-400'
-                                : 'text-slate-500'
-                                }`}>
-                                {tab.label}
-                            </span>
-
-                            {/* Background glow effect */}
-                            {currentTab === tab.id && (
-                                <div className="absolute inset-0 rounded-xl bg-emerald-500/10 -z-10" />
-                            )}
-                        </button>
-                    ))}
+            {/* Bottom Tab Bar */}
+            <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/90 backdrop-blur-xl border-t border-white/5 safe-area-bottom pb-1">
+                <div className="flex justify-around items-center h-[3.25rem]">
+                    {tabs.map((tab) => {
+                        const isActive = currentTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => onTabChange(tab.id)}
+                                className={`flex-1 flex flex-col items-center justify-center gap-0.5 h-full ${isActive ? "text-emerald-400" : "text-slate-500 hover:text-slate-400"
+                                    }`}
+                            >
+                                <span className={`text-xl transition-transform duration-200 ${isActive ? "scale-110 -translate-y-0.5" : ""}`}>
+                                    {tab.icon}
+                                </span>
+                                <span className={`text-[9px] font-semibold transition-opacity duration-200 ${isActive ? "opacity-100" : "opacity-0 scale-0"}`}>
+                                    {tab.label}
+                                </span>
+                                {isActive && (
+                                    <div className="absolute top-0 w-8 h-0.5 bg-emerald-400 rounded-b-full shadow-[0_2px_8px_rgba(16,185,129,0.5)]" />
+                                )}
+                            </button>
+                        );
+                    })}
                 </div>
-            </div>
+            </nav>
+            {/* Spacer for bottom nav */}
+            <div className="h-[4.5rem]" />
         </>
     );
 }

@@ -264,6 +264,7 @@ export function usePersistentGroupData(): {
             name: input.name.trim(),
             colorHue: generateRandomHue(),
             cashBalance: input.initialCash,
+            initialCapital: input.initialCash, // Set initial capital
             totalRealizedPnl: 0,
             createdAt: new Date().toISOString(),
         };
@@ -348,6 +349,7 @@ export function usePersistentGroupData(): {
             name: name.trim(),
             colorHue: generateRandomHue(),
             cashBalance: 0,
+            initialCapital: 0, // Default for empty
             totalRealizedPnl: 0,
             createdAt: new Date().toISOString(),
         };
@@ -639,29 +641,44 @@ export function usePersistentGroupData(): {
 
         const now = new Date().toISOString();
 
-        // Only add snapshot if enough time has passed (at least 1 minute since last)
-        const history = currentGroup.portfolioHistory || [];
-        const memberHistory = history.filter(s => s.memberId === memberId);
-        const lastSnapshot = memberHistory[memberHistory.length - 1];
+        updateGroup(session.groupId, prev => {
+            const history = prev.portfolioHistory || [];
+            const memberHistory = history.filter(s => s.memberId === memberId);
+            const lastSnapshot = memberHistory[memberHistory.length - 1];
 
-        if (lastSnapshot) {
-            const lastTime = new Date(lastSnapshot.timestamp).getTime();
-            const nowTime = new Date(now).getTime();
-            // Skip if less than 1 minute since last snapshot
-            if (nowTime - lastTime < 60 * 1000) return;
-        }
+            let newHistory = [...history];
 
-        const newSnapshot: PortfolioSnapshot = {
-            timestamp: now,
-            memberId,
-            totalValue,
-            costBasis,
-        };
+            const newSnapshot: PortfolioSnapshot = {
+                timestamp: now,
+                memberId,
+                totalValue,
+                costBasis,
+            };
 
-        updateGroup(session.groupId, prev => ({
-            ...prev,
-            portfolioHistory: [...(prev.portfolioHistory || []), newSnapshot],
-        }));
+            // CHECK: Is there already a snapshot for TODAY?
+            // If so, update it instead of appending new one.
+            const isSameDay = (d1: Date, d2: Date) =>
+                d1.getFullYear() === d2.getFullYear() &&
+                d1.getMonth() === d2.getMonth() &&
+                d1.getDate() === d2.getDate();
+
+            if (lastSnapshot && isSameDay(new Date(lastSnapshot.timestamp), new Date(now))) {
+                // Update the last snapshot entry in the main array
+                newHistory = newHistory.map(s =>
+                    (s.memberId === memberId && s.timestamp === lastSnapshot.timestamp)
+                        ? newSnapshot
+                        : s
+                );
+            } else {
+                // Append new
+                newHistory.push(newSnapshot);
+            }
+
+            return {
+                ...prev,
+                portfolioHistory: newHistory,
+            };
+        });
     }, [session, appState.groups, updateGroup]);
 
     // Record snapshots for ALL members in the group (for group chart)
@@ -685,25 +702,60 @@ export function usePersistentGroupData(): {
             if (nowTime - lastTime < 30 * 1000) return;
         }
 
-        // Create a snapshot for each member
-        currentGroup.members.forEach(member => {
-            const memberHoldings = currentGroup.holdings.filter(h => h.memberId === member.id);
-            const holdingsValue = memberHoldings.reduce((sum, h) => sum + (h.quantity * h.currentPrice), 0);
-            const totalValue = member.cashBalance + holdingsValue;
-            const costBasis = memberHoldings.reduce((sum, h) => sum + (h.quantity * h.avgBuyPrice), 0);
+        const isSameDay = (d1: Date, d2: Date) =>
+            d1.getFullYear() === d2.getFullYear() &&
+            d1.getMonth() === d2.getMonth() &&
+            d1.getDate() === d2.getDate();
 
-            newSnapshots.push({
-                timestamp: now,
-                memberId: member.id,
-                totalValue,
-                costBasis,
+        updateGroup(session.groupId, prev => {
+            const history = prev.portfolioHistory || [];
+            let newHistory = [...history];
+
+            // If last snapshot was today, replace it (remove old entries for today)
+            // Actually, for group snapshot, we add multiple entries (one per member).
+            // So we need to remove ALL entries for today if we are updating "today".
+
+            // Simplified logic: Check if the VERY LAST entry in history is from today.
+            // If so, we assume the entire "batch" of snapshots from today should be replaced?
+            // BETTER: Filter out any snapshots from today for these members, then append new ones.
+            // But modifying history blindly is risky. 
+
+            // Let's stick to the Plan: "If there is already a snapshot for the same day, update that snapshot".
+            // Since we store individual member snapshots, we can just iterate.
+
+            const newSnapshotsForUpdate: PortfolioSnapshot[] = [];
+
+            currentGroup.members.forEach(member => {
+                const memberHoldings = currentGroup.holdings.filter(h => h.memberId === member.id);
+                const holdingsValue = memberHoldings.reduce((sum, h) => sum + (h.quantity * h.currentPrice), 0);
+                const totalValue = member.cashBalance + holdingsValue;
+                const costBasis = memberHoldings.reduce((sum, h) => sum + (h.quantity * h.avgBuyPrice), 0);
+
+                // Find existing snapshot for this member from today
+                const existingIndex = newHistory.findIndex(s =>
+                    s.memberId === member.id &&
+                    isSameDay(new Date(s.timestamp), new Date(now))
+                );
+
+                const snapshot = {
+                    timestamp: now,
+                    memberId: member.id,
+                    totalValue,
+                    costBasis,
+                };
+
+                if (existingIndex >= 0) {
+                    newHistory[existingIndex] = snapshot;
+                } else {
+                    newHistory.push(snapshot);
+                }
             });
-        });
 
-        updateGroup(session.groupId, prev => ({
-            ...prev,
-            portfolioHistory: [...(prev.portfolioHistory || []), ...newSnapshots],
-        }));
+            return {
+                ...prev,
+                portfolioHistory: newHistory,
+            };
+        });
     }, [session, appState.groups, updateGroup]);
 
     const helpers: GroupDataHelpers = {

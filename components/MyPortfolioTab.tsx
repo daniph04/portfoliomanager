@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { GroupState, Holding } from "@/lib/types";
+import { GroupState, Holding, PortfolioSnapshot } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
 import { formatCurrency, formatPercent, getMemberColor, getHoldingPnl, getHoldingPnlPercent, getTotalCostBasis, getMemberHoldings, getTotalPortfolioValue } from "@/lib/utils";
 import HoldingFormModal from "./HoldingFormModal";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import DonutChart from "./DonutChart";
+import PerformanceChart from "./PerformanceChart";
+import { ASSET_COLORS } from "@/lib/theme";
 
 interface MyPortfolioTabProps {
     group: GroupState;
@@ -15,29 +17,6 @@ interface MyPortfolioTabProps {
     onWithdraw: () => void;
     helpers: GroupDataHelpers;
 }
-
-// Simple donut chart component
-const DonutChart = ({ data, colors }: { data: { name: string, value: number }[], colors: string[] }) => (
-    <ResponsiveContainer width={120} height={120}>
-        <PieChart>
-            <Pie
-                data={data}
-                innerRadius={35}
-                outerRadius={55}
-                paddingAngle={2}
-                dataKey="value"
-            >
-                {data.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-                ))}
-            </Pie>
-            <Tooltip
-                formatter={(value: number) => formatCurrency(value)}
-                contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "8px" }}
-            />
-        </PieChart>
-    </ResponsiveContainer>
-);
 
 export default function MyPortfolioTab({
     group,
@@ -50,7 +29,7 @@ export default function MyPortfolioTab({
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<"create" | "edit">("create");
     const [editingHolding, setEditingHolding] = useState<Holding | null>(null);
-    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
 
     // Get current user's data
     const currentMember = group.members.find(m => m.id === currentProfileId);
@@ -58,18 +37,22 @@ export default function MyPortfolioTab({
 
     if (!currentMember) {
         return (
-            <div className="flex flex-col items-center justify-center py-20">
-                <div className="text-6xl mb-4">🔐</div>
-                <h3 className="text-xl font-semibold text-slate-200 mb-2">Loading your portfolio...</h3>
+            <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
+                <div className="w-16 h-16 rounded-full bg-slate-800 animate-pulse mb-4" />
+                <h3 className="text-xl font-semibold text-slate-500">Loading profile...</h3>
             </div>
         );
     }
 
-    const totalValue = getTotalPortfolioValue(myHoldings);
-    const costBasis = getTotalCostBasis(myHoldings);
-    const totalWithCash = totalValue + cashBalance;
-    const pnl = totalValue - costBasis;
-    const pnlPercent = costBasis > 0 ? (pnl / costBasis) * 100 : 0;
+    const totalHoldingsValue = getTotalPortfolioValue(myHoldings);
+    const investedAmount = getTotalCostBasis(myHoldings);
+    const totalValue = totalHoldingsValue + cashBalance;
+    const initialCapital = currentMember.initialCapital || 0; // Use fixed initial capital
+    const totalPnl = totalValue - initialCapital;
+    const totalReturnPercent = initialCapital > 0 ? (totalPnl / initialCapital) * 100 : 0;
+
+    // Day P/L (mock for now, or could be calculated if we had yesterday's close)
+    // For now, we focus on Total P/L as the primary metric
 
     // Chart data
     const assetAllocation = myHoldings.reduce((acc, h) => {
@@ -81,12 +64,22 @@ export default function MyPortfolioTab({
     const chartData = Object.entries(assetAllocation).map(([name, value]) => ({
         name,
         value,
+        color: ASSET_COLORS[name as keyof typeof ASSET_COLORS] || ASSET_COLORS.OTHER,
     }));
+
     if (cashBalance > 0) {
-        chartData.push({ name: "CASH", value: cashBalance });
+        chartData.push({
+            name: "CASH",
+            value: cashBalance,
+            color: ASSET_COLORS.CASH
+        });
     }
 
-    const chartColors = ["#10b981", "#06b6d4", "#f59e0b", "#8b5cf6", "#6b7280"];
+    // Sort by value desc
+    chartData.sort((a, b) => b.value - a.value);
+
+    // Filter history for this member
+    const memberHistory = group.portfolioHistory.filter(p => p.memberId === currentProfileId);
 
     // Handlers
     const handleAddHolding = () => {
@@ -111,189 +104,238 @@ export default function MyPortfolioTab({
         if (modalMode === "create") {
             await helpers.addHolding(currentProfileId, formData);
         } else if (editingHolding) {
-            // Update existing holding - just update via price map for now
             await helpers.updateHoldingPrices({ [editingHolding.symbol]: formData.currentPrice });
         }
     };
 
+    const memberColor = getMemberColor(currentMember.colorHue);
+
     return (
-        <div className="space-y-6 animate-fade-in">
-            {/* Header with user info - Premium Card */}
-            <div className="card-premium rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                        {/* Avatar with glow effect */}
-                        <div className="relative">
-                            <div
-                                className="w-16 h-16 rounded-xl flex items-center justify-center text-2xl font-bold text-white shadow-lg"
-                                style={{ backgroundColor: getMemberColor(currentMember.colorHue) }}
-                            >
-                                {currentMember.name.charAt(0).toUpperCase()}
+        <div className="space-y-6 pb-20 animate-fade-in">
+            {/* Main Portfolio Header Card */}
+            <div className="relative overflow-hidden rounded-3xl bg-slate-900 border border-white/5 shadow-2xl">
+                {/* Background ambient glow */}
+                <div
+                    className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2"
+                    style={{ backgroundColor: `${memberColor}20` }}
+                />
+
+                <div className="relative p-6 z-10">
+                    <div className="flex items-center justify-between mb-8">
+                        <div className="flex items-center gap-4">
+                            <div className="relative">
+                                <div
+                                    className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold text-white shadow-lg backdrop-blur-md bg-white/10 border border-white/10"
+                                    style={{ textShadow: `0 0 10px ${memberColor}` }}
+                                >
+                                    {currentMember.avatarInitials || currentMember.name.substring(0, 2).toUpperCase()}
+                                </div>
+                                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-2 border-slate-900 rounded-full flex items-center justify-center">
+                                    <span className="text-[10px] text-white font-bold">✓</span>
+                                </div>
                             </div>
-                            <div
-                                className="absolute inset-0 rounded-xl blur-lg opacity-40"
-                                style={{ backgroundColor: getMemberColor(currentMember.colorHue) }}
-                            />
+                            <div>
+                                <h2 className="text-xl font-bold text-white tracking-tight">{currentMember.name}</h2>
+                                <div className="flex items-center gap-2 text-sm text-slate-400">
+                                    <span>Initial: {formatCurrency(initialCapital, 0)}</span>
+                                </div>
+                            </div>
                         </div>
+                        <button
+                            onClick={handleAddHolding}
+                            className="bg-white text-slate-900 hover:bg-slate-200 active:scale-95 transition-all text-sm font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-white/10 flex items-center gap-2"
+                        >
+                            <span className="text-lg leading-none">+</span>
+                            Trade
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-8">
                         <div>
-                            <h1 className="text-2xl font-bold text-white">{currentMember.name}</h1>
-                            <p className="text-slate-400 text-sm">{myHoldings.length} position{myHoldings.length !== 1 ? 's' : ''}</p>
+                            <div className="text-sm text-slate-400 font-medium mb-1">Portfolio Value</div>
+                            <div className="text-3xl font-bold text-white tracking-tight">
+                                {formatCurrency(totalValue)}
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-sm text-slate-400 font-medium mb-1">Total Return</div>
+                            <div className={`text-3xl font-bold tracking-tight ${totalPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                {totalPnl >= 0 ? "+" : ""}{formatCurrency(totalPnl)}
+                            </div>
+                            <div className={`text-sm font-medium ${totalPnl >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                                {totalPnl >= 0 ? "▲" : "▼"} {formatPercent(totalReturnPercent)}
+                            </div>
                         </div>
                     </div>
-                    <button
-                        onClick={handleAddHolding}
-                        className="btn-premium flex items-center gap-2"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                        <span className="hidden sm:inline">Add Position</span>
-                        <span className="sm:hidden">Add</span>
-                    </button>
                 </div>
 
-                {/* Portfolio stats - Premium Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {/* Total Value */}
-                    <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-                        <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total Value</div>
-                        <div className="text-xl font-bold text-white">{formatCurrency(totalWithCash, 0)}</div>
-                    </div>
+                {/* Mini Chart Area */}
+                <div className="h-48 w-full mt-2 relative">
+                    <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-900 to-transparent z-10" />
+                    <PerformanceChart
+                        portfolioHistory={memberHistory}
+                        currentValue={totalValue}
+                        initialCapital={initialCapital}
+                        memberId={currentProfileId}
+                        showControls={true}
+                    />
+                </div>
+            </div>
 
-                    {/* Invested */}
-                    <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-                        <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Invested</div>
-                        <div className="text-lg font-bold text-slate-300">{formatCurrency(costBasis, 0)}</div>
+            {/* Cash Balance Card */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-5 rounded-2xl bg-slate-800/40 border border-white/5 flex items-center justify-between">
+                    <div>
+                        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Buying Power</div>
+                        <div className="text-2xl font-bold text-white">{formatCurrency(cashBalance)}</div>
                     </div>
-
-                    {/* P&L with glow effect */}
-                    <div className={`bg-white/5 rounded-xl p-4 border ${pnl >= 0 ? 'border-emerald-500/20' : 'border-red-500/20'}`}>
-                        <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">P/L</div>
-                        <div className={`text-lg font-bold ${pnl >= 0 ? "pnl-positive" : "pnl-negative"}`}>
-                            {pnl >= 0 ? "+" : ""}{formatCurrency(pnl, 0)}
-                        </div>
-                        <div className={`text-xs ${pnl >= 0 ? "text-emerald-400/70" : "text-red-400/70"}`}>
-                            {formatPercent(pnlPercent, 1)}
-                        </div>
+                    <div className="flex gap-2">
+                        <button onClick={onDeposit} className="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg text-sm font-medium hover:bg-emerald-500/20 transition-colors">
+                            Deposit
+                        </button>
+                        <button onClick={onWithdraw} className="px-3 py-1.5 bg-slate-700/50 text-slate-300 rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors">
+                            Withdraw
+                        </button>
                     </div>
+                </div>
 
-                    {/* Cash with actions */}
-                    <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-                        <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Cash</div>
-                        <div className="text-lg font-bold text-cyan-400">{formatCurrency(cashBalance, 0)}</div>
-                        <div className="flex gap-1 mt-2">
-                            <button
-                                onClick={onDeposit}
-                                className="text-[10px] px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded-md font-medium hover:bg-emerald-500/30 transition-colors"
-                            >
-                                + Dep
-                            </button>
-                            <button
-                                onClick={onWithdraw}
-                                className="text-[10px] px-2 py-1 bg-slate-700/50 text-slate-400 rounded-md font-medium hover:bg-slate-700 transition-colors"
-                            >
-                                - Wd
-                            </button>
-                        </div>
+                <div className="p-5 rounded-2xl bg-slate-800/40 border border-white/5 flex items-center justify-between">
+                    <div>
+                        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Invested Assets</div>
+                        <div className="text-2xl font-bold text-slate-200">{formatCurrency(totalHoldingsValue)}</div>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                        <span className="text-blue-400 text-lg">📊</span>
                     </div>
                 </div>
             </div>
 
-            {/* Asset Allocation */}
-            {chartData.length > 0 && (
-                <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4">
-                    <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Distribution</h3>
-                    <div className="flex items-center gap-4">
-                        <DonutChart data={chartData} colors={chartColors} />
-                        <div className="flex-1 space-y-2">
-                            {chartData.map((item, i) => (
-                                <div key={item.name} className="flex items-center justify-between text-sm">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: chartColors[i] }} />
-                                        <span className="text-slate-300">{item.name}</span>
+            {/* Holdings & Allocation */}
+            <div className="flex flex-col lg:flex-row gap-6">
+                {/* Allocation */}
+                {chartData.length > 0 && (
+                    <div className="lg:w-1/3 bg-slate-900/50 border border-white/5 rounded-3xl p-6">
+                        <h3 className="text-lg font-bold text-white mb-6">Allocation</h3>
+                        <div className="flex justify-center mb-6">
+                            <DonutChart
+                                data={chartData}
+                                centerLabel="Assets"
+                                centerValue={formatCurrency(totalValue, 0)}
+                                highlightedCategory={highlightedCategory}
+                                onHoverCategory={setHighlightedCategory}
+                                size={220}
+                            />
+                        </div>
+                        <div className="space-y-3">
+                            {chartData.map((item) => (
+                                <div
+                                    key={item.name}
+                                    onMouseEnter={() => setHighlightedCategory(item.name)}
+                                    onMouseLeave={() => setHighlightedCategory(null)}
+                                    className={`flex items-center justify-between p-2 rounded-xl transition-colors cursor-pointer ${highlightedCategory === item.name ? "bg-white/5" : "hover:bg-white/5"
+                                        }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                                        <span className="text-sm font-medium text-slate-300">
+                                            {item.name === "STOCK" ? "Stocks" : item.name === "CRYPTO" ? "Crypto" : item.name}
+                                        </span>
                                     </div>
-                                    <span className="text-slate-400">{formatCurrency(item.value, 0)}</span>
+                                    <div className="text-right">
+                                        <div className="text-sm font-bold text-white">{((item.value / totalValue) * 100).toFixed(1)}%</div>
+                                        <div className="text-[10px] text-slate-500">{formatCurrency(item.value, 0)}</div>
+                                    </div>
                                 </div>
                             ))}
                         </div>
                     </div>
-                </div>
-            )}
-
-            {/* Holdings List */}
-            <div>
-                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Positions</h3>
-                {myHoldings.length === 0 ? (
-                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 text-center">
-                        <div className="text-4xl mb-3">📋</div>
-                        <p className="text-slate-400 mb-4">No open positions</p>
-                        <button
-                            onClick={handleAddHolding}
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-colors"
-                        >
-                            Add first position
-                        </button>
-                    </div>
-                ) : (
-                    <div className="space-y-2">
-                        {myHoldings.map((holding) => {
-                            const holdingValue = holding.quantity * holding.currentPrice;
-                            const holdingPnl = getHoldingPnl(holding);
-                            const holdingPnlPercent = getHoldingPnlPercent(holding);
-
-                            return (
-                                <div
-                                    key={holding.id}
-                                    className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-all"
-                                >
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`px-2 py-1 rounded text-xs font-medium ${holding.assetClass === "CRYPTO" ? "bg-amber-500/20 text-amber-400" :
-                                                holding.assetClass === "ETF" ? "bg-purple-500/20 text-purple-400" :
-                                                    "bg-cyan-500/20 text-cyan-400"
-                                                }`}>
-                                                {holding.assetClass}
-                                            </div>
-                                            <div>
-                                                <div className="font-bold text-slate-100">{holding.symbol}</div>
-                                                <div className="text-xs text-slate-500">{holding.name}</div>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="font-bold text-slate-100">{formatCurrency(holdingValue)}</div>
-                                            <div className={`text-sm ${holdingPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                                {holdingPnl >= 0 ? "+" : ""}{formatCurrency(holdingPnl)} ({formatPercent(holdingPnlPercent, 1)})
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
-                                        <span>{holding.quantity.toLocaleString()} shares @ ${holding.avgBuyPrice.toFixed(2)}</span>
-                                        <span>Current: ${holding.currentPrice.toFixed(2)}</span>
-                                    </div>
-
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => handleEditHolding(holding)}
-                                            className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors text-sm font-medium"
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            onClick={() => handleSellHolding(holding)}
-                                            className="flex-1 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors text-sm font-medium"
-                                        >
-                                            Sell
-                                        </button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
                 )}
+
+                {/* Holdings List */}
+                <div className="flex-1 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-white">Your Positions</h3>
+                        <span className="text-xs font-medium text-slate-500 bg-slate-800 px-2 py-1 rounded-lg">
+                            {myHoldings.length} Assets
+                        </span>
+                    </div>
+
+                    {myHoldings.length === 0 ? (
+                        <div className="bg-slate-900/50 border border-dashed border-slate-800 rounded-3xl p-10 text-center">
+                            <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                                🚀
+                            </div>
+                            <h3 className="text-white font-bold mb-2">Start Investing</h3>
+                            <p className="text-slate-400 text-sm mb-6 max-w-xs mx-auto">
+                                Add your first stock or crypto position to begin tracking your performance.
+                            </p>
+                            <button
+                                onClick={handleAddHolding}
+                                className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl transition-colors shadow-lg shadow-emerald-500/20"
+                            >
+                                Add Position
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {myHoldings.map((holding) => {
+                                const holdingValue = holding.quantity * holding.currentPrice;
+                                const holdingPnl = getHoldingPnl(holding);
+                                const holdingPnlPercent = getHoldingPnlPercent(holding);
+                                const isProfit = holdingPnl >= 0;
+
+                                return (
+                                    <div
+                                        key={holding.id}
+                                        onClick={() => handleEditHolding(holding)}
+                                        className="group bg-slate-900/50 border border-white/5 hover:border-white/10 rounded-2xl p-4 transition-all hover:bg-slate-800/50 cursor-pointer active:scale-[0.99]"
+                                    >
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex items-center gap-4">
+                                                {/* Asset Icon */}
+                                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold shadow-inner ${holding.assetClass === "CRYPTO" ? "bg-orange-500/10 text-orange-500" :
+                                                    holding.assetClass === "ETF" ? "bg-cyan-500/10 text-cyan-500" :
+                                                        "bg-emerald-500/10 text-emerald-500"
+                                                    }`}>
+                                                    {holding.symbol.substring(0, 2)}
+                                                </div>
+
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <h4 className="font-bold text-white text-lg">{holding.symbol}</h4>
+                                                        <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-medium">
+                                                            {holding.assetClass}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-sm text-slate-400">
+                                                        {holding.quantity} @ {formatCurrency(holding.avgBuyPrice)}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="text-right">
+                                                <div className="font-bold text-white text-lg">
+                                                    {formatCurrency(holdingValue)}
+                                                </div>
+                                                <div className={`text-sm font-medium flex items-center justify-end gap-1 ${isProfit ? "text-emerald-400" : "text-red-400"
+                                                    }`}>
+                                                    <span>{isProfit ? "+" : ""}{formatCurrency(holdingPnl)}</span>
+                                                    <span className={`text-xs px-1.5 py-0.5 rounded ${isProfit ? "bg-emerald-500/10" : "bg-red-500/10"
+                                                        }`}>
+                                                        {formatPercent(holdingPnlPercent)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* Holding Modal */}
+            {/* Modal */}
             <HoldingFormModal
                 open={isModalOpen}
                 mode={modalMode}

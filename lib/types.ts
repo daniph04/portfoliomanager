@@ -22,9 +22,10 @@ export interface Member {
     id: string;
     name: string;
     colorHue: number;           // 0-360 for HSL color generation
-    cashBalance: number;        // Not used for P/L (legacy, keep for compatibility)
+    cashBalance: number;        // Uninvested cash
     totalRealizedPnl: number;   // Cumulative realized P/L from all sales
-    startingCapital?: number;   // Initial investment amount (INFO ONLY - not used for P/L)
+    initialCapital?: number;    // The starting bankroll (fixed when joining)
+    avatarInitials?: string;    // e.g. "DP"
     createdAt: string;          // ISO timestamp
 }
 

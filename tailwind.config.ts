@@ -11,35 +11,37 @@ const config: Config = {
             colors: {
                 background: "var(--background)",
                 foreground: "var(--foreground)",
-                // Semantic colors for consistent design
+                primary: {
+                    DEFAULT: "#10b981", // emerald-500
+                    dark: "#059669",    // emerald-600
+                },
+                accent: {
+                    DEFAULT: "#f59e0b", // amber-500
+                },
+                // Asset class colors
+                stock: "#10b981",
+                crypto: "#f59e0b",
+                etf: "#06b6d4",
+                other: "#8b5cf6",
+                cash: "#64748b",
+
+                // Semantic colors
                 success: {
-                    DEFAULT: "#22c55e",
-                    light: "#4ade80",
-                    dark: "#16a34a",
-                    muted: "rgba(34, 197, 94, 0.1)",
+                    DEFAULT: "#10b981",
+                    muted: "rgba(16, 185, 129, 0.1)",
                 },
                 danger: {
                     DEFAULT: "#ef4444",
-                    light: "#f87171",
-                    dark: "#dc2626",
                     muted: "rgba(239, 68, 68, 0.1)",
                 },
                 warning: {
-                    DEFAULT: "#fbbf24",
-                    light: "#fcd34d",
-                    dark: "#f59e0b",
-                    muted: "rgba(251, 191, 36, 0.1)",
-                },
-                accent: {
-                    DEFAULT: "#6366f1",
-                    light: "#818cf8",
-                    dark: "#4f46e5",
-                    muted: "rgba(99, 102, 241, 0.1)",
+                    DEFAULT: "#f59e0b",
+                    muted: "rgba(245, 158, 11, 0.1)",
                 },
                 // Elevated surfaces
                 elevated: {
-                    DEFAULT: "#0a0f1e",
-                    hover: "rgba(255, 255, 255, 0.05)",
+                    DEFAULT: "#0f172a", // slate-900
+                    hover: "#1e293b",   // slate-800
                 },
             },
             animation: {
