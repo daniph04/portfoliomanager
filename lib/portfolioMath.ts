@@ -1,4 +1,4 @@
-import { Holding, Member, GroupState } from "./types";
+import { Holding, Member, GroupState, Season } from "./types";
 
 /**
  * Computes metrics for a single position (holding).
@@ -83,5 +83,77 @@ export function computeGroupMetrics(group: GroupState) {
         groupPL,
         groupPLPct,
         memberMetrics
+    };
+}
+
+/**
+ * Computes season-specific metrics for an investor.
+ * Season P&L is calculated from the portfolio value at season start.
+ * @param member The member (investor).
+ * @param holdings The array of all holdings.
+ * @param season The season to calculate metrics for.
+ */
+export function computeSeasonMetrics(
+    member: Member,
+    holdings: Holding[],
+    season: Season | null
+) {
+    const investorMetrics = computeInvestorMetrics(member, holdings);
+
+    if (!season) {
+        // No active season - return zeroed season metrics
+        return {
+            ...investorMetrics,
+            seasonInitialValue: investorMetrics.portfolioValue,
+            seasonCurrentValue: investorMetrics.portfolioValue,
+            seasonPLAbs: 0,
+            seasonPLPct: 0,
+            hasSeasonData: false,
+        };
+    }
+
+    // Get the member's portfolio value at season start
+    const seasonInitialValue = season.memberSnapshots[member.id] ?? investorMetrics.portfolioValue;
+    const seasonCurrentValue = investorMetrics.portfolioValue;
+
+    const seasonPLAbs = seasonCurrentValue - seasonInitialValue;
+    const seasonPLPct = seasonInitialValue === 0 ? 0 : (seasonPLAbs / seasonInitialValue) * 100;
+
+    return {
+        ...investorMetrics,
+        seasonInitialValue,
+        seasonCurrentValue,
+        seasonPLAbs,
+        seasonPLPct,
+        hasSeasonData: true,
+    };
+}
+
+/**
+ * Computes season metrics for the entire group.
+ * @param group The group state.
+ * @param season The active season (or null if none).
+ */
+export function computeGroupSeasonMetrics(group: GroupState, season: Season | null) {
+    const memberSeasonMetrics = group.members.map(m =>
+        computeSeasonMetrics(m, group.holdings, season)
+    );
+
+    const groupSeasonInitial = memberSeasonMetrics.reduce((sum, m) => sum + m.seasonInitialValue, 0);
+    const groupSeasonCurrent = memberSeasonMetrics.reduce((sum, m) => sum + m.seasonCurrentValue, 0);
+
+    const groupSeasonPLAbs = groupSeasonCurrent - groupSeasonInitial;
+    const groupSeasonPLPct = groupSeasonInitial === 0 ? 0 : (groupSeasonPLAbs / groupSeasonInitial) * 100;
+
+    // Also compute all-time metrics
+    const allTimeMetrics = computeGroupMetrics(group);
+
+    return {
+        ...allTimeMetrics,
+        memberSeasonMetrics,
+        groupSeasonInitial,
+        groupSeasonCurrent,
+        groupSeasonPLAbs,
+        groupSeasonPLPct,
     };
 }

@@ -1,15 +1,52 @@
 "use client";
 
-import { GroupState, Holding } from "@/lib/types";
+import { useState } from "react";
+import { GroupState, Holding, Season } from "@/lib/types";
 import { sortMembersByPerformance, formatCurrency, formatPercent, getMemberColor, getHoldingPnlPercent, getHoldingPnl, getTotalCostBasis, getTotalPortfolioValue } from "@/lib/utils";
+import { computeSeasonMetrics } from "@/lib/portfolioMath";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
+
+type RankingMode = "season" | "allTime";
 
 interface LeaderboardTabProps {
     group: GroupState;
+    currentSeason?: Season | null;
+    isLeader?: boolean;
+    onStartSeason?: () => void;
+    onEndSeason?: () => void;
 }
 
-export default function LeaderboardTab({ group }: LeaderboardTabProps) {
-    const rankings = sortMembersByPerformance(group);
+export default function LeaderboardTab({
+    group,
+    currentSeason,
+    isLeader = false,
+    onStartSeason,
+    onEndSeason,
+}: LeaderboardTabProps) {
+    const [rankingMode, setRankingMode] = useState<RankingMode>("allTime");
+
+    // All-time rankings (using existing function)
+    const allTimeRankings = sortMembersByPerformance(group);
+
+    // Season rankings (if season active, sort by season performance)
+    const seasonRankings = currentSeason
+        ? group.members.map(m => {
+            const metrics = computeSeasonMetrics(m, group.holdings, currentSeason);
+            const memberHoldings = group.holdings.filter(h => h.memberId === m.id);
+            return {
+                member: m,
+                totalValue: metrics.portfolioValue,
+                costBasis: metrics.totalCostBasis,
+                pnl: metrics.seasonPLAbs,
+                pnlPercent: metrics.seasonPLPct,
+                holdingCount: memberHoldings.length,
+            };
+        }).sort((a, b) => b.pnlPercent - a.pnlPercent)
+        : allTimeRankings;
+
+    // Use the appropriate rankings based on mode
+    const rankings = (rankingMode === "season" && currentSeason) ? seasonRankings : allTimeRankings;
+
     const hasAnyHoldings = group.holdings.length > 0;
 
     // Get best and worst trades
@@ -146,6 +183,53 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                             <p className="text-slate-400">{group.members.length} investors competing</p>
                         </div>
                     </div>
+
+                    {/* Season Controls - visible to leader */}
+                    <div className="flex items-center gap-3">
+                        {/* Mode Toggle */}
+                        {currentSeason && (
+                            <div className="flex gap-1 bg-slate-800/50 rounded-lg p-1">
+                                <button
+                                    onClick={() => setRankingMode("season")}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${rankingMode === "season"
+                                        ? "bg-amber-500/20 text-amber-400"
+                                        : "text-slate-500 hover:text-slate-300"
+                                        }`}
+                                >
+                                    {currentSeason.name}
+                                </button>
+                                <button
+                                    onClick={() => setRankingMode("allTime")}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${rankingMode === "allTime"
+                                        ? "bg-emerald-500/20 text-emerald-400"
+                                        : "text-slate-500 hover:text-slate-300"
+                                        }`}
+                                >
+                                    All Time
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Start/End Season Button - only for leader */}
+                        {isLeader && !currentSeason && onStartSeason && (
+                            <button
+                                onClick={onStartSeason}
+                                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg font-bold text-sm hover:from-amber-400 hover:to-orange-400 transition-all shadow-lg"
+                            >
+                                <span>🚀</span>
+                                Start Season
+                            </button>
+                        )}
+                        {isLeader && currentSeason && onEndSeason && (
+                            <button
+                                onClick={onEndSeason}
+                                className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg font-medium text-sm hover:bg-slate-600 transition-all"
+                            >
+                                End Season
+                            </button>
+                        )}
+                    </div>
+
                     <div className="grid grid-cols-3 gap-6 text-center">
                         <div>
                             <div className="text-xl md:text-2xl font-bold text-slate-100">{formatCurrency(totalGroupValue, 0)}</div>

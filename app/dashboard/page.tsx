@@ -111,6 +111,9 @@ export default function DashboardPage() {
             amountChangeUsd: a.amountChangeUsd,
         })),
         portfolioHistory: [],
+        seasons: [],
+        leaderId: undefined,
+        currentSeasonId: undefined,
     };
 
     // Adapt helpers to work with Supabase (cast to any to handle async differences)

@@ -29,8 +29,10 @@ export interface Member {
     createdAt: string;          // ISO timestamp
 }
 
-// Activity event types
-export type ActivityType = "BUY" | "SELL" | "UPDATE" | "NOTE" | "DEPOSIT" | "WITHDRAW" | "JOIN";
+// Activity event types - expanded for seasons
+export type ActivityType =
+    | "BUY" | "SELL" | "UPDATE" | "NOTE" | "DEPOSIT" | "WITHDRAW" | "JOIN"
+    | "GROUP_CREATED" | "SEASON_STARTED" | "SEASON_ENDED";
 
 // Activity event for tracking all portfolio changes
 export interface ActivityEvent {
@@ -50,6 +52,18 @@ export interface PortfolioSnapshot {
     memberId: string;           // Which member this snapshot is for
     totalValue: number;         // Cash + Holdings value at this moment
     costBasis: number;          // Total cost basis at this moment
+    scope?: "user" | "group";   // NEW: What this snapshot represents
+    entityId?: string;          // NEW: userId or groupId
+}
+
+// Season for competitive periods
+export interface Season {
+    id: string;                    // "season_1", "season_2", etc.
+    name: string;                  // "Season 1"
+    startTime: string;             // ISO timestamp
+    endTime?: string;              // ISO timestamp (undefined if active)
+    leaderId: string;              // Who started the season
+    memberSnapshots: Record<string, number>; // userId -> portfolio value at season start
 }
 
 // Current user session (stored separately from group)
@@ -66,6 +80,10 @@ export interface GroupState {
     holdings: Holding[];        // Flat array, each holding has memberId
     activity: ActivityEvent[];
     portfolioHistory: PortfolioSnapshot[];  // Real historical snapshots
+    // Season support
+    leaderId?: string;          // Group owner who can start seasons
+    currentSeasonId?: string;   // Active season ID (undefined if none)
+    seasons: Season[];          // All seasons history
 }
 
 // Multi-group storage (localStorage stores multiple groups)

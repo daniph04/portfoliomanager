@@ -11,9 +11,11 @@ import {
     CreateProfileInput,
     AppState,
     UserSession,
-    PortfolioSnapshot
+    PortfolioSnapshot,
+    Season
 } from "./types";
 import { generateId, generateRandomHue } from "./utils";
+import { computeInvestorMetrics } from "./portfolioMath";
 
 const STORAGE_KEY = "portfolio_league_app_v3";
 const SESSION_KEY = "portfolio_league_session";
@@ -27,6 +29,9 @@ function createEmptyGroup(name: string): GroupState {
         holdings: [],
         activity: [],
         portfolioHistory: [],
+        seasons: [],           // NEW: Empty seasons array
+        leaderId: undefined,   // NEW: Will be set when first member creates profile
+        currentSeasonId: undefined,
     };
 }
 
@@ -72,6 +77,12 @@ export interface GroupDataHelpers {
     getPortfolioHistory: (memberId: string) => PortfolioSnapshot[];
     recordPortfolioSnapshot: (memberId: string) => void;
     recordAllMembersSnapshot: () => void;
+
+    // Season operations (NEW)
+    getCurrentSeason: () => Season | null;
+    startSeason: () => Season | null;
+    endSeason: () => void;
+    isGroupLeader: (userId: string) => boolean;
 }
 
 export function usePersistentGroupData(): {
@@ -114,6 +125,9 @@ export function usePersistentGroupData(): {
                         holdings: parsed.holdings || [],
                         activity: [], // Clear old activity as requested
                         portfolioHistory: [],
+                        seasons: [],
+                        leaderId: undefined,
+                        currentSeasonId: undefined,
                     };
                     setAppState({ groups: [migratedGroup], currentSession: null });
                 } else {
@@ -131,6 +145,9 @@ export function usePersistentGroupData(): {
                             holdings: [],
                             activity: [],
                             portfolioHistory: [],
+                            seasons: [],
+                            leaderId: undefined,
+                            currentSeasonId: undefined,
                         };
                         localStorage.setItem(`group_password_${nanosectaGroup.id}`, btoa("Pibes2004@"));
                         parsed.groups.push(nanosectaGroup);
@@ -172,6 +189,9 @@ export function usePersistentGroupData(): {
                     holdings: [],
                     activity: [],
                     portfolioHistory: [],
+                    seasons: [],
+                    leaderId: undefined,
+                    currentSeasonId: undefined,
                 };
                 localStorage.setItem(`group_password_${nanosectaGroup.id}`, btoa("Pibes2004@"));
                 setAppState({ groups: [nanosectaGroup], currentSession: null });
@@ -802,6 +822,121 @@ export function usePersistentGroupData(): {
         });
     }, [session, appState.groups, updateGroup]);
 
+    // ===== SEASON FUNCTIONS =====
+
+    // Get the current active season
+    const getCurrentSeason = useCallback((): Season | null => {
+        if (!session?.groupId) return null;
+        const currentGroup = appState.groups.find(g => g.id === session.groupId);
+        if (!currentGroup?.currentSeasonId || !currentGroup.seasons) return null;
+        return currentGroup.seasons.find(s => s.id === currentGroup.currentSeasonId) || null;
+    }, [session, appState.groups]);
+
+    // Check if user is the group leader
+    const isGroupLeader = useCallback((userId: string): boolean => {
+        if (!session?.groupId) return false;
+        const currentGroup = appState.groups.find(g => g.id === session.groupId);
+        // If no leader is set, the first member is considered leader
+        if (!currentGroup?.leaderId && currentGroup?.members.length) {
+            return currentGroup.members[0].id === userId;
+        }
+        return currentGroup?.leaderId === userId;
+    }, [session, appState.groups]);
+
+    // Start a new season (only leader can do this)
+    const startSeason = useCallback((): Season | null => {
+        if (!session?.groupId || !session.profileId) return null;
+
+        const currentGroup = appState.groups.find(g => g.id === session.groupId);
+        if (!currentGroup) return null;
+
+        // Check if caller is the leader
+        if (!isGroupLeader(session.profileId)) {
+            console.warn("Only the group leader can start a new season");
+            return null;
+        }
+
+        // Check if there's already an active season
+        if (currentGroup.currentSeasonId) {
+            console.warn("There's already an active season. End it first.");
+            return null;
+        }
+
+        const now = new Date().toISOString();
+        const seasonNumber = (currentGroup.seasons?.length || 0) + 1;
+
+        // Calculate current value for each member
+        const memberSnapshots: Record<string, number> = {};
+        currentGroup.members.forEach(member => {
+            const metrics = computeInvestorMetrics(member, currentGroup.holdings);
+            memberSnapshots[member.id] = metrics.portfolioValue;
+        });
+
+        const newSeason: Season = {
+            id: `season_${seasonNumber}`,
+            name: `Season ${seasonNumber}`,
+            startTime: now,
+            leaderId: session.profileId,
+            memberSnapshots,
+        };
+
+        const profileIdForLeader = session.profileId ?? undefined;
+
+        updateGroup(session.groupId, prev => ({
+            ...prev,
+            seasons: [...(prev.seasons || []), newSeason],
+            currentSeasonId: newSeason.id,
+            leaderId: prev.leaderId || profileIdForLeader, // Set leader if not set
+            activity: [{
+                id: generateId(),
+                timestamp: now,
+                memberId: session.profileId,
+                type: "SEASON_STARTED" as const,
+                title: `${newSeason.name} started`,
+                description: `New season started with ${currentGroup.members.length} investors competing.`,
+            }, ...prev.activity],
+        }));
+
+        return newSeason;
+    }, [session, appState.groups, isGroupLeader, updateGroup]);
+
+    // End the current season
+    const endSeason = useCallback((): void => {
+        if (!session?.groupId || !session.profileId) return;
+
+        const currentGroup = appState.groups.find(g => g.id === session.groupId);
+        if (!currentGroup?.currentSeasonId) {
+            console.warn("No active season to end");
+            return;
+        }
+
+        // Check if caller is the leader
+        if (!isGroupLeader(session.profileId)) {
+            console.warn("Only the group leader can end a season");
+            return;
+        }
+
+        const now = new Date().toISOString();
+
+        updateGroup(session.groupId, prev => ({
+            ...prev,
+            currentSeasonId: undefined,
+            seasons: prev.seasons.map(s =>
+                s.id === prev.currentSeasonId
+                    ? { ...s, endTime: now }
+                    : s
+            ),
+            activity: [{
+                id: generateId(),
+                timestamp: now,
+                memberId: session.profileId,
+                type: "SEASON_ENDED" as const,
+                title: `Season ended`,
+                description: `The current season has been concluded.`,
+            }, ...prev.activity],
+        }));
+    }, [session, appState.groups, isGroupLeader, updateGroup]);
+
     const helpers: GroupDataHelpers = {
         createGroup,
         findGroup,
@@ -823,6 +958,11 @@ export function usePersistentGroupData(): {
         getPortfolioHistory,
         recordPortfolioSnapshot,
         recordAllMembersSnapshot,
+        // Season functions
+        getCurrentSeason,
+        startSeason,
+        endSeason,
+        isGroupLeader,
     };
 
     return { group, appState, session, helpers, isLoading };

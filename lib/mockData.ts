@@ -10,4 +10,7 @@ export const initialGroupState: GroupState = {
     holdings: [],
     activity: [],
     portfolioHistory: [],
+    seasons: [],
+    leaderId: undefined,
+    currentSeasonId: undefined,
 };

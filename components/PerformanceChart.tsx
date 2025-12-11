@@ -2,18 +2,23 @@
 
 import { useState, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
-import { PortfolioSnapshot } from "@/lib/types";
+import { PortfolioSnapshot, Season } from "@/lib/types";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 
-type TimeRange = "1D" | "1W" | "1M" | "1Y" | "ALL";
+type TimeRange = "1D" | "1W" | "1M" | "YTD" | "ALL";
+type DisplayMode = "season" | "allTime";
 
 interface PerformanceChartProps {
     currentValue: number;
-    initialCapital: number; // Used for "ALL" time return
+    initialCapital: number; // Used for "All Time" return
     portfolioHistory: PortfolioSnapshot[];
     memberId?: string; // If provided, filters for specific member
     className?: string;
     showControls?: boolean;
+    // Season-related props
+    currentSeason?: Season | null;
+    seasonInitialValue?: number; // Portfolio value at season start for this member
+    showModeToggle?: boolean; // Whether to show Season/AllTime toggle
 }
 
 export default function PerformanceChart({
@@ -23,22 +28,43 @@ export default function PerformanceChart({
     memberId,
     className = "",
     showControls = true,
+    currentSeason,
+    seasonInitialValue,
+    showModeToggle = false,
 }: PerformanceChartProps) {
     const [timeRange, setTimeRange] = useState<TimeRange>("1W");
+    const [displayMode, setDisplayMode] = useState<DisplayMode>("allTime");
     const [showPercentage, setShowPercentage] = useState(true);
+
+    // Determine the base value for percentage calculations
+    const baseValue = useMemo(() => {
+        if (displayMode === "season" && seasonInitialValue && seasonInitialValue > 0) {
+            return seasonInitialValue;
+        }
+        return initialCapital;
+    }, [displayMode, seasonInitialValue, initialCapital]);
+
+    // Determine cutoff time for data filtering
+    const cutoffTime = useMemo(() => {
+        const now = new Date();
+
+        // In season mode, always start from season start time
+        if (displayMode === "season" && currentSeason?.startTime) {
+            return new Date(currentSeason.startTime);
+        }
+
+        switch (timeRange) {
+            case "1D": return new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            case "1W": return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            case "1M": return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            case "YTD": return new Date(now.getFullYear(), 0, 1); // Jan 1 of current year
+            case "ALL": default: return new Date(0);
+        }
+    }, [timeRange, displayMode, currentSeason?.startTime]);
 
     // Filter and aggregate history
     const chartData = useMemo(() => {
         const now = new Date();
-        let cutoffTime: Date;
-
-        switch (timeRange) {
-            case "1D": cutoffTime = new Date(now.getTime() - 24 * 60 * 60 * 1000); break;
-            case "1W": cutoffTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
-            case "1M": cutoffTime = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break;
-            case "1Y": cutoffTime = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000); break;
-            case "ALL": default: cutoffTime = new Date(0);
-        }
 
         // 1. Filter by member if needed
         let history = memberId
@@ -57,7 +83,7 @@ export default function PerformanceChart({
                 timestamp: new Date(parseInt(ts)).toISOString(),
                 totalValue: val,
                 memberId: "group",
-                costBasis: initialCapital // Use group initial capital
+                costBasis: baseValue
             })).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
         } else {
             history = history.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
@@ -70,68 +96,106 @@ export default function PerformanceChart({
         const currentPoint = {
             timestamp: now.toISOString(),
             totalValue: currentValue,
-            costBasis: initialCapital,
+            costBasis: baseValue,
             memberId: memberId || "group",
-            percentChange: initialCapital > 0 ? ((currentValue - initialCapital) / initialCapital) * 100 : 0,
+            percentChange: baseValue > 0 ? ((currentValue - baseValue) / baseValue) * 100 : 0,
         };
 
-        // If no history, create baseline
+        // If no history, create baseline from baseValue
         if (filtered.length === 0) {
             const startPoint = {
                 timestamp: new Date(now.getTime() - 3600000).toISOString(),
-                totalValue: initialCapital,
-                costBasis: initialCapital,
+                totalValue: baseValue,
+                costBasis: baseValue,
                 memberId: memberId || "group",
                 percentChange: 0,
             };
             return [startPoint, currentPoint];
         }
 
-        // Calculate percentage change for each point relative to initial capital
+        // Calculate percentage change for each point relative to base value
         const dataWithPercent = filtered.map(point => ({
             ...point,
-            percentChange: initialCapital > 0
-                ? ((point.totalValue - initialCapital) / initialCapital) * 100
+            percentChange: baseValue > 0
+                ? ((point.totalValue - baseValue) / baseValue) * 100
                 : 0,
         }));
 
         return [...dataWithPercent, currentPoint];
-    }, [portfolioHistory, memberId, timeRange, currentValue, initialCapital]);
+    }, [portfolioHistory, memberId, cutoffTime, currentValue, baseValue]);
 
-    // Calculate variations for display (based on time range, not all-time)
-    const startValue = chartData.length > 0 ? chartData[0].totalValue : initialCapital;
+    // Calculate variations for display
+    const startValue = chartData.length > 0 ? chartData[0].totalValue : baseValue;
     const changeValue = currentValue - startValue;
     const changePercent = startValue > 0 ? (changeValue / startValue) * 100 : 0;
     const isPositive = changeValue >= 0;
 
-    // Total return from initial capital
-    const totalReturn = currentValue - initialCapital;
-    const totalReturnPercent = initialCapital > 0 ? (totalReturn / initialCapital) * 100 : 0;
+    // Total return calculation
+    const totalReturn = currentValue - baseValue;
+    const totalReturnPercent = baseValue > 0 ? (totalReturn / baseValue) * 100 : 0;
+    const isTotalPositive = totalReturn >= 0;
 
     // Theme colors
-    const color = isPositive ? "#10b981" : "#ef4444"; // emerald-500 : red-500
-    // Additional gold accent for high performance could be added later
+    const color = isTotalPositive ? "#10b981" : "#ef4444";
+
+    // Display label for mode
+    const modeLabel = displayMode === "season"
+        ? (currentSeason?.name || "Season")
+        : "All Time";
 
     return (
         <div className={`w-full ${className}`}>
             {/* Header / Stats */}
-            <div className="mb-6">
+            <div className="mb-4">
                 <div className="text-3xl font-bold text-white tracking-tight">
                     {formatCurrency(currentValue)}
                 </div>
-                <div className={`flex items-center gap-2 text-sm font-medium ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
-                    <span>{isPositive ? "▲" : "▼"} {formatCurrency(Math.abs(changeValue))}</span>
-                    <span>({formatPercent(Math.abs(changePercent))})</span>
-                    <span className="text-slate-500 font-normal uppercase ml-1">{timeRange === "ALL" ? "All Time" : timeRange}</span>
+                <div className={`flex items-center gap-2 text-sm font-medium ${isTotalPositive ? "text-emerald-400" : "text-red-400"}`}>
+                    <span>{isTotalPositive ? "▲" : "▼"} {formatCurrency(Math.abs(totalReturn))}</span>
+                    <span>({isTotalPositive ? "+" : ""}{formatPercent(totalReturnPercent)})</span>
+                    <span className="text-slate-500 font-normal ml-1">{modeLabel}</span>
                 </div>
             </div>
 
-            {/* Chart */}
-            <div className="h-64 w-full relative">
+            {/* Mode Toggle (Season / All Time) */}
+            {showModeToggle && currentSeason && (
+                <div className="flex gap-1 mb-4">
+                    <button
+                        onClick={() => setDisplayMode("season")}
+                        className={`
+                            px-4 py-2 rounded-lg text-xs font-bold transition-all
+                            ${displayMode === "season"
+                                ? "bg-amber-500/20 text-amber-400 border border-amber-500/50"
+                                : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 border border-transparent"
+                            }
+                        `}
+                    >
+                        {currentSeason.name || "Season"}
+                    </button>
+                    <button
+                        onClick={() => setDisplayMode("allTime")}
+                        className={`
+                            px-4 py-2 rounded-lg text-xs font-bold transition-all
+                            ${displayMode === "allTime"
+                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50"
+                                : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 border border-transparent"
+                            }
+                        `}
+                    >
+                        All Time
+                    </button>
+                </div>
+            )}
+
+            {/* Chart - proper height with padding to prevent cropping */}
+            <div className="h-64 w-full relative" style={{ marginLeft: '-8px', paddingRight: '8px' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData}>
+                    <AreaChart
+                        data={chartData}
+                        margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                    >
                         <defs>
-                            <linearGradient id="chartColor" x1="0" y1="0" x2="0" y2="1">
+                            <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor={color} stopOpacity={0.3} />
                                 <stop offset="95%" stopColor={color} stopOpacity={0} />
                             </linearGradient>
@@ -145,7 +209,9 @@ export default function PerformanceChart({
                             }
                             stroke="#64748b"
                             style={{ fontSize: '11px' }}
-                            width={50}
+                            width={55}
+                            axisLine={false}
+                            tickLine={false}
                         />
                         <XAxis hide={true} />
                         <Tooltip
@@ -155,7 +221,7 @@ export default function PerformanceChart({
                                     const date = new Date(data.timestamp);
                                     const pct = data.percentChange || 0;
                                     return (
-                                        <div className="bg-slate-900 border border-slate-700 p-3 rounded-lg shadow-xl">
+                                        <div className="bg-slate-900/95 backdrop-blur-sm border border-slate-700 p-3 rounded-lg shadow-xl">
                                             <p className="text-slate-400 text-xs mb-1">
                                                 {date.toLocaleString(undefined, {
                                                     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -165,7 +231,7 @@ export default function PerformanceChart({
                                                 {formatCurrency(data.totalValue)}
                                             </p>
                                             <p className={`text-xs font-medium mt-1 ${pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                {pct >= 0 ? '+' : ''}{formatPercent(pct)} from start
+                                                {pct >= 0 ? '+' : ''}{formatPercent(pct)} from {displayMode === "season" ? "season start" : "initial"}
                                             </p>
                                         </div>
                                     );
@@ -177,9 +243,9 @@ export default function PerformanceChart({
                             type="monotone"
                             dataKey={showPercentage ? "percentChange" : "totalValue"}
                             stroke={color}
-                            strokeWidth={3}
-                            fill="url(#chartColor)"
-                            animationDuration={1000}
+                            strokeWidth={2.5}
+                            fill="url(#chartGradient)"
+                            animationDuration={800}
                         />
                         {/* Zero line reference */}
                         {showPercentage && (
@@ -189,19 +255,19 @@ export default function PerformanceChart({
                 </ResponsiveContainer>
             </div>
 
-            {/* Time Controls */}
-            {showControls && (
-                <div className="flex justify-between items-center mt-4">
-                    <div className="flex gap-1">
-                        {(["1D", "1W", "1M", "1Y"] as TimeRange[]).map((r) => (
+            {/* Time Controls - more prominent styling */}
+            {showControls && displayMode === "allTime" && (
+                <div className="flex justify-between items-center mt-4 px-1">
+                    <div className="flex gap-1 bg-slate-900/50 rounded-lg p-1">
+                        {(["1D", "1W", "1M", "YTD", "ALL"] as TimeRange[]).map((r) => (
                             <button
                                 key={r}
                                 onClick={() => setTimeRange(r)}
                                 className={`
-                                    px-3 py-1.5 rounded-lg text-xs font-bold transition-all
+                                    px-3 py-1.5 rounded-md text-xs font-bold transition-all
                                     ${timeRange === r
-                                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50"
-                                        : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/50"
+                                        ? "bg-slate-700 text-white"
+                                        : "text-slate-500 hover:text-slate-300"
                                     }
                                 `}
                             >
@@ -211,10 +277,17 @@ export default function PerformanceChart({
                     </div>
                     <button
                         onClick={() => setShowPercentage(!showPercentage)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-300 hover:bg-slate-800/50 transition-all"
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-slate-300 hover:bg-slate-800/50 transition-all border border-slate-700"
                     >
                         {showPercentage ? "%" : "$"}
                     </button>
+                </div>
+            )}
+
+            {/* In season mode, show note about timeframe */}
+            {showControls && displayMode === "season" && currentSeason && (
+                <div className="mt-4 px-1 text-xs text-slate-500">
+                    Showing performance since {new Date(currentSeason.startTime).toLocaleDateString()}
                 </div>
             )}
         </div>
