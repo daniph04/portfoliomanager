@@ -286,13 +286,58 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                 </div>
             )}
 
+            {/* Quick Stats Metric Block */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">👥</span>
+                        <span className="text-xs text-slate-500 uppercase tracking-wide">Investors</span>
+                    </div>
+                    <div className="text-2xl font-bold text-slate-100">{group.members.length}</div>
+                </div>
+                <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">📊</span>
+                        <span className="text-xs text-slate-500 uppercase tracking-wide">Positions</span>
+                    </div>
+                    <div className="text-2xl font-bold text-slate-100">{group.holdings.length}</div>
+                </div>
+                <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">💰</span>
+                        <span className="text-xs text-slate-500 uppercase tracking-wide">Total Value</span>
+                    </div>
+                    <div className="text-2xl font-bold text-slate-100">{formatCurrency(totalHoldingsValue, 0)}</div>
+                </div>
+                <div className={`bg-slate-900/50 backdrop-blur-xl border rounded-xl p-4 ${totalPnl >= 0 ? 'border-emerald-500/20' : 'border-red-500/20'}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">{totalPnl >= 0 ? '📈' : '📉'}</span>
+                        <span className="text-xs text-slate-500 uppercase tracking-wide">P/L</span>
+                    </div>
+                    <div className={`text-2xl font-bold ${totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {totalPnl >= 0 ? '+' : ''}{formatCurrency(totalPnl, 0)}
+                    </div>
+                    <div className={`text-sm ${totalPnl >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
+                        {formatPercent(totalPnlPercent, 1)}
+                    </div>
+                </div>
+            </div>
+
             {/* Performance Chart - Robinhood Style */}
-            <PerformanceChart
-                currentValue={totalHoldingsValue}
-                totalCostBasis={totalCostBasis}
-                hasHoldings={group.holdings.length > 0}
-                portfolioHistory={group.portfolioHistory || []}
-            />
+            <div>
+                <PerformanceChart
+                    currentValue={totalHoldingsValue}
+                    totalCostBasis={totalCostBasis}
+                    hasHoldings={group.holdings.length > 0}
+                    portfolioHistory={group.portfolioHistory || []}
+                />
+                {/* Tracking subtitle */}
+                {(group.portfolioHistory || []).length > 0 && (
+                    <p className="text-xs text-slate-500 text-center mt-2">
+                        Tracking group performance since {new Date((group.portfolioHistory || [])[0]?.timestamp || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </p>
+                )}
+            </div>
 
             {/* Asset Allocation - Premium Card */}
             <div className="card-premium rounded-2xl p-6">

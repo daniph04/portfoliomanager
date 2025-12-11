@@ -227,23 +227,41 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
 
             {/* Main Panel */}
             <div className="flex-1 min-w-0">
-                {/* Mobile selector */}
+                {/* Mobile selector - Compact horizontal pills with P/L */}
                 <div className="lg:hidden mb-4">
-                    <h2 className="text-xl font-bold text-slate-100 mb-2">Investors</h2>
-                    <div className="flex gap-2 overflow-x-auto pb-2">
+                    <div className="flex items-center justify-between mb-2">
+                        <h2 className="text-lg font-bold text-slate-100">Investors</h2>
+                        <span className="text-xs text-slate-500">{group.members.length} total</span>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1">
                         {group.members.map((member) => {
+                            const holdings = getMemberHoldings(group.holdings, member.id);
+                            const pnlPct = getTotalPnlPercent(holdings);
+                            const hasHoldings = holdings.length > 0;
                             const isSelected = selectedMemberId === member.id;
                             return (
                                 <button
                                     key={member.id}
                                     onClick={() => onSelectMember(member.id)}
-                                    className={`flex-shrink-0 px-4 py-2 rounded-full transition-all ${isSelected
-                                        ? "text-white"
-                                        : "bg-slate-800 text-slate-300"
+                                    className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl transition-all border ${isSelected
+                                        ? "border-white/20 bg-slate-800"
+                                        : "border-transparent bg-slate-800/50 hover:bg-slate-800"
                                         }`}
-                                    style={isSelected ? { backgroundColor: getMemberColor(member.colorHue) } : {}}
                                 >
-                                    {member.name}
+                                    <div
+                                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                                        style={{ backgroundColor: getMemberColor(member.colorHue) }}
+                                    >
+                                        {member.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="text-left">
+                                        <div className="text-sm font-medium text-slate-100">{member.name}</div>
+                                        {hasHoldings && (
+                                            <div className={`text-xs font-medium ${pnlPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                {pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%
+                                            </div>
+                                        )}
+                                    </div>
                                 </button>
                             );
                         })}

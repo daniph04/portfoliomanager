@@ -128,6 +128,7 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                 <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4 md:p-6">
                     <h3 className="text-lg font-semibold text-slate-100 mb-4 flex items-center gap-2">
                         <span>🏁</span> Performance Race
+                        <span className="text-xs font-normal text-slate-500 ml-2">· Leader in bold</span>
                     </h3>
                     <div className="h-48 md:h-64">
                         <ResponsiveContainer width="100%" height="100%">
@@ -154,17 +155,21 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
                                     formatter={(value: number, name: string) => [`${value.toFixed(2)}%`, name]}
                                 />
                                 <Legend />
-                                {rankings.map((entry, idx) => (
-                                    <Line
-                                        key={entry.member.id}
-                                        type="monotone"
-                                        dataKey={entry.member.name}
-                                        stroke={getMemberColor(entry.member.colorHue)}
-                                        strokeWidth={3}
-                                        dot={{ r: 6, fill: getMemberColor(entry.member.colorHue) }}
-                                        activeDot={{ r: 8 }}
-                                    />
-                                ))}
+                                {rankings.map((entry, idx) => {
+                                    const isLeader = idx === 0;
+                                    return (
+                                        <Line
+                                            key={entry.member.id}
+                                            type="monotone"
+                                            dataKey={entry.member.name}
+                                            stroke={isLeader ? "#f59e0b" : getMemberColor(entry.member.colorHue)}
+                                            strokeWidth={isLeader ? 4 : 2}
+                                            dot={{ r: isLeader ? 6 : 4, fill: isLeader ? "#f59e0b" : getMemberColor(entry.member.colorHue) }}
+                                            activeDot={{ r: isLeader ? 10 : 6 }}
+                                            style={isLeader ? { filter: "drop-shadow(0 0 4px rgba(245, 158, 11, 0.5))" } : undefined}
+                                        />
+                                    );
+                                })}
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
