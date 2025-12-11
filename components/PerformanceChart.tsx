@@ -2,38 +2,39 @@
 
 import { useMemo, useState } from "react";
 import { Area, AreaChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { PerformancePoint } from "@/lib/types";
-import { formatCurrency, formatPercent } from "@/lib/utils";
 import { MetricsMode } from "@/lib/portfolioMath";
+import { PerformanceScope, PortfolioSnapshot } from "@/lib/types";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 
-type Timeframe = "1D" | "1W" | "1M" | "YTD" | "ALL";
+export type Timeframe = "1D" | "1W" | "1M" | "YTD" | "ALL";
 
 interface PerformanceChartProps {
-    points: PerformancePoint[];
-    baseline: number;
+    snapshots: PortfolioSnapshot[];
+    scope: PerformanceScope;
+    entityId: string;
+    timeframe: Timeframe;
     mode: MetricsMode;
-    startTime?: number;
+    seasonBaseline?: number;
+    seasonStart?: number;
     className?: string;
     height?: number;
-    showHeader?: boolean;
     showControls?: boolean;
-    initialTimeframe?: Timeframe;
     onTimeframeChange?: (value: Timeframe) => void;
 }
 
 export default function PerformanceChart({
-    points,
-    baseline,
+    snapshots,
+    scope,
+    entityId,
+    timeframe,
     mode,
-    startTime,
+    seasonBaseline,
+    seasonStart,
     className = "",
-    height = 280,
-    showHeader = false,
+    height = 260,
     showControls = true,
-    initialTimeframe = "1M",
     onTimeframeChange,
 }: PerformanceChartProps) {
-    const [timeframe, setTimeframe] = useState<Timeframe>(initialTimeframe);
     const [showPercentage, setShowPercentage] = useState(true);
 
     const cutoff = useMemo(() => {
@@ -42,10 +43,7 @@ export default function PerformanceChart({
             case "1D": return now - 24 * 60 * 60 * 1000;
             case "1W": return now - 7 * 24 * 60 * 60 * 1000;
             case "1M": return now - 30 * 24 * 60 * 60 * 1000;
-            case "YTD": {
-                const yearStart = new Date(new Date().getFullYear(), 0, 1).getTime();
-                return yearStart;
-            }
+            case "YTD": return new Date(new Date().getFullYear(), 0, 1).getTime();
             case "ALL":
             default:
                 return 0;
@@ -53,68 +51,63 @@ export default function PerformanceChart({
     }, [timeframe]);
 
     const series = useMemo(() => {
-        const sorted = [...points].sort((a, b) => a.timestamp - b.timestamp);
-        const latestValue = sorted[sorted.length - 1]?.value ?? baseline;
-        const nowPoint = { timestamp: Date.now(), value: latestValue, scope: "user" as const, entityId: "" };
-        const working = [...sorted, nowPoint];
+        const normalized = snapshots
+            .filter(s => (s.scope || "user") === scope && (s.entityId || s.memberId) === entityId)
+            .map(s => ({
+                timestamp: typeof s.timestamp === "string" ? new Date(s.timestamp).getTime() : s.timestamp,
+                value: s.totalCurrentValue ?? s.totalValue,
+                costBasis: s.costBasis,
+            }))
+            .sort((a, b) => a.timestamp - b.timestamp);
 
-        const filtered = working.filter(p => {
-            const meetsTimeframe = p.timestamp >= cutoff;
-            const meetsStart = startTime ? p.timestamp >= startTime : true;
-            return meetsTimeframe && meetsStart;
-        });
+        const filtered = normalized.filter(p => p.timestamp >= cutoff);
+        const working = filtered.length > 0 ? filtered : normalized;
 
-        let base = baseline;
-        if (mode === "season" && startTime) {
-            const anchor = working.find(p => p.timestamp >= startTime) || working[working.length - 1];
-            if (anchor) base = anchor.value;
-        } else if (filtered.length > 0) {
-            base = filtered[0].value;
+        // Determine base value (season baseline or first point)
+        let baseValue: number | undefined;
+        if (mode === "season") {
+            if (seasonBaseline !== undefined) {
+                baseValue = seasonBaseline;
+            } else if (seasonStart) {
+                const anchor = working.find(p => p.timestamp >= seasonStart);
+                baseValue = anchor?.value ?? working[0]?.value;
+            }
+        }
+        if (baseValue === undefined) {
+            baseValue = working[0]?.value ?? 0;
         }
 
-        const safeBase = base > 0 ? base : latestValue || 1;
+        let data = working.length > 0 ? working : [{
+            timestamp: Date.now(),
+            value: baseValue,
+            costBasis: baseValue,
+        }];
 
-        let normalized = filtered.length > 0 ? filtered : [{ timestamp: Date.now(), value: safeBase, scope: "user", entityId: "" }];
-        if (normalized.length === 1) {
-            normalized = [
-                normalized[0],
-                { ...normalized[0], timestamp: normalized[0].timestamp + 1000 },
+        if (data.length === 1) {
+            data = [
+                data[0],
+                { ...data[0], timestamp: data[0].timestamp + 1000 },
             ];
         }
 
-        return normalized.map(point => ({
+        const safeBase = baseValue > 0 ? baseValue : data[0].value || 1;
+
+        return data.map(point => ({
             timestamp: point.timestamp,
             value: point.value,
-            pct: ((point.value - safeBase) / safeBase) * 100,
+            pct: safeBase > 0 ? ((point.value - safeBase) / safeBase) * 100 : 0,
         }));
-    }, [points, baseline, cutoff, mode, startTime]);
+    }, [snapshots, scope, entityId, cutoff, mode, seasonBaseline, seasonStart]);
 
-    const latest = series[series.length - 1] || { value: baseline, pct: 0, timestamp: Date.now() };
+    const latest = series[series.length - 1] || { value: 0, pct: 0, timestamp: Date.now() };
     const first = series[0] || latest;
     const changeValue = latest.value - first.value;
     const changePct = first.value !== 0 ? (changeValue / first.value) * 100 : 0;
-    const totalReturn = latest.value - baseline;
-    const totalReturnPct = baseline !== 0 ? (totalReturn / baseline) * 100 : 0;
-    const isPositive = totalReturn >= 0;
+    const isPositive = changeValue >= 0;
     const color = isPositive ? "#10b981" : "#ef4444";
-
-    const handleTimeframe = (tf: Timeframe) => {
-        setTimeframe(tf);
-        onTimeframeChange?.(tf);
-    };
 
     return (
         <div className={`w-full ${className}`}>
-            {showHeader && (
-                <div className="mb-3">
-                    <div className="text-2xl font-bold text-white">{formatCurrency(latest.value)}</div>
-                    <div className={`text-sm font-medium flex items-center gap-2 ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
-                        <span>{isPositive ? "▲" : "▼"} {formatCurrency(Math.abs(totalReturn))}</span>
-                        <span>({isPositive ? "+" : ""}{formatPercent(totalReturnPct)})</span>
-                    </div>
-                </div>
-            )}
-
             <div className="w-full" style={{ height }}>
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
@@ -169,6 +162,7 @@ export default function PerformanceChart({
                             strokeWidth={2.5}
                             fill="url(#chartGradient)"
                             animationDuration={400}
+                            isAnimationActive={series.length < 100}
                         />
                         {showPercentage && (
                             <ReferenceLine y={0} stroke="#475569" strokeDasharray="3 3" strokeWidth={1} />
@@ -183,7 +177,7 @@ export default function PerformanceChart({
                         {(["1D", "1W", "1M", "YTD", "ALL"] as Timeframe[]).map(tf => (
                             <button
                                 key={tf}
-                                onClick={() => handleTimeframe(tf)}
+                                onClick={() => onTimeframeChange?.(tf)}
                                 className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${timeframe === tf ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"}`}
                             >
                                 {tf}

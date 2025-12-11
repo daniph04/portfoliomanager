@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { GroupState, Holding, PerformancePoint, Season } from "@/lib/types";
+import { GroupState, Holding, Season } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
 import { formatCurrency, formatPercent, getMemberColor, getHoldingPnl, getHoldingPnlPercent, getTotalCostBasis, getMemberHoldings, getTotalPortfolioValue } from "@/lib/utils";
 import { getMetricsForMode, MetricsMode } from "@/lib/portfolioMath";
 import HoldingFormModal from "./HoldingFormModal";
 import SellConfirmModal from "./SellConfirmModal";
 import DonutChart from "./DonutChart";
-import PerformanceChart from "./PerformanceChart";
+import PerformanceChart, { Timeframe } from "./PerformanceChart";
 import { ASSET_COLORS } from "@/lib/theme";
 
 interface MyPortfolioTabProps {
@@ -35,6 +35,7 @@ export default function MyPortfolioTab({
     const [sellingHolding, setSellingHolding] = useState<Holding | null>(null);
     const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
     const [displayMode, setDisplayMode] = useState<MetricsMode>("allTime");
+    const [timeframe, setTimeframe] = useState<Timeframe>("1M");
 
     // Get current user's data
     const currentMember = group.members.find(m => m.id === currentProfileId);
@@ -55,25 +56,19 @@ export default function MyPortfolioTab({
         group.portfolioHistory
     ) : { currentValue: 0, baseline: 0, plAbs: 0, plPct: 0, modeLabel: "All Time", mode: "allTime" as const, portfolioValue: 0, investedValue: 0, cashBalance: 0 };
 
-    // memberHistory must be before early return
-    const memberHistory: PerformancePoint[] = useMemo(() => {
-        const raw = group.portfolioHistory.filter(p => (p.entityId || p.memberId) === currentProfileId);
-        const mapped = raw.map(p => ({
-            timestamp: new Date(p.timestamp).getTime(),
-            value: p.totalValue,
-            scope: p.scope === "group" ? "group" as const : "user" as const,
-            entityId: p.entityId || p.memberId,
-        }));
-        if (mapped.length === 0) {
-            return [{
-                timestamp: Date.now(),
-                value: metrics.currentValue,
-                scope: "user" as const,
-                entityId: currentProfileId,
-            }];
-        }
-        return mapped;
-    }, [group.portfolioHistory, currentProfileId, metrics.currentValue]);
+    const chartSnapshots = useMemo(() => {
+        if (group.portfolioHistory.length > 0) return group.portfolioHistory;
+        return [{
+            id: `fallback_${currentProfileId}`,
+            timestamp: Date.now(),
+            memberId: currentProfileId,
+            totalValue: metrics.currentValue,
+            totalCurrentValue: metrics.currentValue,
+            costBasis: metrics.baseline,
+            scope: "user" as const,
+            entityId: currentProfileId,
+        }];
+    }, [currentProfileId, group.portfolioHistory, metrics.baseline, metrics.currentValue]);
 
     if (!currentMember) {
         return (
@@ -231,11 +226,15 @@ export default function MyPortfolioTab({
                 {/* Chart Area - bigger and without overlay covering controls */}
                 <div className="px-4 pb-6">
                     <PerformanceChart
-                        points={memberHistory}
-                        baseline={metrics.baseline}
+                        snapshots={chartSnapshots}
+                        scope="user"
+                        entityId={currentProfileId}
+                        timeframe={timeframe}
                         mode={displayMode}
-                        startTime={displayMode === "season" && currentSeason ? new Date(currentSeason.startTime).getTime() : undefined}
+                        seasonBaseline={displayMode === "season" ? metrics.baseline : undefined}
+                        seasonStart={displayMode === "season" && currentSeason ? new Date(currentSeason.startTime).getTime() : undefined}
                         showControls
+                        onTimeframeChange={setTimeframe}
                         className="h-64"
                     />
                 </div>

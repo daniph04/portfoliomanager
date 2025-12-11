@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/lib/hooks/useUser";
 import TopNav from "@/components/TopNav";
@@ -10,9 +10,8 @@ import MembersTab from "@/components/MembersTab";
 import MyPortfolioTab from "@/components/MyPortfolioTab";
 import ActivityTab from "@/components/ActivityTab";
 import CashModal from "@/components/CashModal";
-import { GroupState, Member, Holding, ActivityEvent, Season } from "@/lib/types";
+import { GroupState, Season, PortfolioSnapshot } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
-import { getTotalPortfolioValue } from "@/lib/utils";
 
 type TabType = "portfolio" | "overview" | "investors" | "leaderboard" | "activity";
 
@@ -31,20 +30,20 @@ export default function DashboardPage() {
         users,
         holdings,
         activity,
-        getUserHoldings,
         addHolding,
         updateHolding,
         deleteHolding,
         depositCash,
         withdrawCash,
-        refreshData,
+        addActivity,
     } = useUser();
 
     // Client-side seasons state (persisted in localStorage since Supabase doesn't have seasons table yet)
     const [seasons, setSeasons] = useState<Season[]>([]);
     const [currentSeasonId, setCurrentSeasonId] = useState<string | undefined>(undefined);
+    const [portfolioHistory, setPortfolioHistory] = useState<PortfolioSnapshot[]>([]);
 
-    // Load seasons from localStorage
+    // Load seasons and snapshots from localStorage
     useEffect(() => {
         if (!currentGroup?.id) return;
         const storageKey = `seasons_${currentGroup.id}`;
@@ -58,6 +57,23 @@ export default function DashboardPage() {
                 console.error("Failed to parse seasons from localStorage", e);
             }
         }
+
+        // Load snapshots
+        const snapshotsKey = `snapshots_${currentGroup.id}`;
+        const storedSnapshots = localStorage.getItem(snapshotsKey);
+        if (storedSnapshots) {
+            try {
+                const parsed: PortfolioSnapshot[] = JSON.parse(storedSnapshots);
+                const normalized = parsed.map(s => ({
+                    ...s,
+                    timestamp: typeof s.timestamp === "string" ? new Date(s.timestamp).getTime() : s.timestamp,
+                    totalCurrentValue: s.totalCurrentValue ?? s.totalValue,
+                }));
+                setPortfolioHistory(normalized);
+            } catch (e) {
+                console.error("Failed to parse snapshots from localStorage", e);
+            }
+        }
     }, [currentGroup?.id]);
 
     // Save seasons to localStorage whenever they change
@@ -66,6 +82,13 @@ export default function DashboardPage() {
         const storageKey = `seasons_${currentGroup.id}`;
         localStorage.setItem(storageKey, JSON.stringify({ seasons, currentSeasonId }));
     }, [seasons, currentSeasonId, currentGroup?.id]);
+
+    // Save snapshots to localStorage
+    useEffect(() => {
+        if (!currentGroup?.id) return;
+        const snapshotsKey = `snapshots_${currentGroup.id}`;
+        localStorage.setItem(snapshotsKey, JSON.stringify(portfolioHistory));
+    }, [portfolioHistory, currentGroup?.id]);
 
     // Redirect if not authenticated or no group
     useEffect(() => {
@@ -87,6 +110,82 @@ export default function DashboardPage() {
         }
     }, [isLoading, users, selectedMemberId, currentUser]);
 
+    // Helper to capture portfolio snapshots for performance charts
+    const computeMemberSnapshot = useCallback((userId: string) => {
+        const user = users.find(u => u.id === userId);
+        if (!user) return null;
+
+        const userHoldings = holdings.filter(h => h.userId === user.id);
+        const holdingsValue = userHoldings.reduce((sum, h) => sum + (h.quantity * h.currentPrice), 0);
+        const holdingsCost = userHoldings.reduce((sum, h) => sum + (h.quantity * h.avgBuyPrice), 0);
+
+        return {
+            totalValue: holdingsValue + user.cashBalance,
+            costBasis: holdingsCost + user.cashBalance,
+        };
+    }, [holdings, users]);
+
+    // Helper to capture portfolio snapshots for performance charts
+    const captureSnapshots = useCallback(() => {
+        if (!currentGroup || users.length === 0) return;
+
+        const timestamp = Date.now();
+        const newSnapshots: PortfolioSnapshot[] = [];
+
+        // Capture snapshot for each user
+        users.forEach(user => {
+            const snapshot = computeMemberSnapshot(user.id);
+            if (!snapshot) return;
+
+            newSnapshots.push({
+                id: `${user.id}_${timestamp}`,
+                timestamp,
+                memberId: user.id,
+                totalValue: snapshot.totalValue,
+                totalCurrentValue: snapshot.totalValue,
+                costBasis: snapshot.costBasis,
+                scope: "user",
+                entityId: user.id,
+            });
+        });
+
+        // Capture group-level snapshot
+        const groupTotals = newSnapshots.reduce((acc, s) => {
+            return {
+                totalValue: acc.totalValue + s.totalValue,
+                costBasis: acc.costBasis + s.costBasis,
+            };
+        }, { totalValue: 0, costBasis: 0 });
+
+        newSnapshots.push({
+            id: `group_${currentGroup.id}_${timestamp}`,
+            timestamp,
+            memberId: currentGroup.id,
+            totalValue: groupTotals.totalValue,
+            totalCurrentValue: groupTotals.totalValue,
+            costBasis: groupTotals.costBasis,
+            scope: "group",
+            entityId: currentGroup.id,
+        });
+
+        // Add to history, keeping only last 1000 snapshots to avoid bloat
+        setPortfolioHistory(prev => {
+            const combined = [...prev, ...newSnapshots];
+            return combined.slice(-1000);
+        });
+    }, [computeMemberSnapshot, currentGroup, users]);
+
+    // Capture snapshots when holdings or users change (throttle to avoid too many)
+    useEffect(() => {
+        if (!isLoading && currentGroup && users.length > 0) {
+            // Delay to batch multiple rapid changes
+            const timeoutId = setTimeout(() => {
+                captureSnapshots();
+            }, 1000);
+            return () => clearTimeout(timeoutId);
+        }
+    }, [captureSnapshots, currentGroup, holdings, isLoading, users.length]);
+
     const handleOpenDeposit = () => {
         setCashModalMode("deposit");
         setCashModalOpen(true);
@@ -103,6 +202,7 @@ export default function DashboardPage() {
         } else {
             await withdrawCash(amount);
         }
+        captureSnapshots();
     };
 
     // Adapt data to old GroupState format for compatibility with existing components
@@ -138,14 +238,14 @@ export default function DashboardPage() {
             description: a.description,
             amountChangeUsd: a.amountChangeUsd,
         })),
-        portfolioHistory: [],
+        portfolioHistory: portfolioHistory,
         seasons: seasons,
         leaderId: currentGroup?.createdBy,
         currentSeasonId: currentSeasonId,
     };
 
     // Season handlers
-    const handleStartSeason = () => {
+    const handleStartSeason = async () => {
         if (!currentGroup || !currentUser) return;
 
         const seasonNumber = seasons.length + 1;
@@ -157,20 +257,25 @@ export default function DashboardPage() {
             memberSnapshots: {},
         };
 
-        // Capture each member's current portfolio value as their season starting point
+        // Capture each member's current portfolio value as their season baseline
         users.forEach(user => {
-            const userHoldings = holdings.filter(h => h.userId === user.id);
-            const holdingsValue = userHoldings.reduce((sum, h) => sum + (h.quantity * h.currentPrice), 0);
-            const portfolioValue = holdingsValue + user.cashBalance;
-            newSeason.memberSnapshots[user.id] = portfolioValue;
+            const snapshot = computeMemberSnapshot(user.id);
+            newSeason.memberSnapshots[user.id] = snapshot?.totalValue ?? 0;
         });
 
-        setSeasons([...seasons, newSeason]);
+        setSeasons(prev => [...prev, newSeason]);
         setCurrentSeasonId(newSeason.id);
+        captureSnapshots();
 
-        // Add activity event (using addActivity from useUser which already exists)
-        // We'll need to add this to the activity manually since it's a group-level event
-        // For now, this will be handled when we verify the implementation
+        // Add activity event for season start
+        if (addActivity && currentGroup) {
+            await addActivity(
+                currentGroup.id,
+                "SEASON_STARTED",
+                `Started ${newSeason.name}`,
+                `${currentUser.name || "Someone"} started a new season`
+            );
+        }
     };
 
     const handleEndSeason = () => {
@@ -186,11 +291,12 @@ export default function DashboardPage() {
                     await updateHolding(h.id, { currentPrice: newPrice });
                 }
             }
+            captureSnapshots();
         },
         addHolding: async (memberId: string, input: any) => {
             if (memberId !== currentUser?.id) return null;
             const result = await addHolding(input);
-            return result ? {
+            const normalized = result ? {
                 id: result.id,
                 memberId: result.userId,
                 symbol: result.symbol,
@@ -201,12 +307,25 @@ export default function DashboardPage() {
                 currentPrice: result.currentPrice,
                 cryptoId: result.cryptoId,
             } : null;
+
+            captureSnapshots();
+            return normalized;
+        },
+        updateHolding: async (holdingId: string, partial: any) => {
+            await updateHolding(holdingId, {
+                quantity: partial.quantity,
+                avgBuyPrice: partial.avgBuyPrice,
+                currentPrice: partial.currentPrice,
+            });
+            captureSnapshots();
         },
         sellHolding: async (holdingId: string) => {
             await deleteHolding(holdingId);
+            captureSnapshots();
         },
-        recordPortfolioSnapshot: () => { },
-        getPortfolioHistory: () => [],
+        recordPortfolioSnapshot: () => captureSnapshots(),
+        recordAllMembersSnapshot: () => captureSnapshots(),
+        getPortfolioHistory: () => portfolioHistory,
     };
 
     if (isLoading) {

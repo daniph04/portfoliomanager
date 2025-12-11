@@ -59,7 +59,7 @@ export interface ActivityItem {
     id: string;
     groupId: string;
     userId: string;
-    type: 'BUY' | 'SELL' | 'UPDATE' | 'NOTE' | 'DEPOSIT' | 'WITHDRAW' | 'JOIN';
+    type: 'BUY' | 'SELL' | 'UPDATE' | 'NOTE' | 'DEPOSIT' | 'WITHDRAW' | 'JOIN' | 'GROUP_CREATED' | 'SEASON_STARTED' | 'SEASON_ENDED';
     symbol?: string;
     title: string;
     description?: string;

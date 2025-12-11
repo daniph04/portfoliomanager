@@ -48,14 +48,26 @@ export interface ActivityEvent {
 }
 
 // Portfolio value snapshot for historical chart
+export type PerformanceScope = "user" | "group";
+
 export interface PortfolioSnapshot {
-    id?: string;                // Optional unique id for deduplication
-    timestamp: string;          // ISO timestamp
-    memberId: string;           // Which member this snapshot is for
-    totalValue: number;         // Cash + Holdings value at this moment
-    costBasis: number;          // Total cost basis at this moment
-    scope?: "user" | "group";   // NEW: What this snapshot represents
-    entityId?: string;          // NEW: userId or groupId
+    id?: string;                        // Optional unique id for deduplication
+    timestamp: number | string;         // ms timestamp (or ISO legacy)
+    memberId: string;                   // Which member this snapshot is for
+    totalValue: number;                 // Cash + Holdings value at this moment (mark-to-market)
+    costBasis: number;                  // Total cost basis at this moment (cost + cash)
+    scope?: PerformanceScope;           // What this snapshot represents
+    entityId?: string;                  // userId or groupId
+    totalCurrentValue?: number;         // Optional alias for charts (same as totalValue)
+}
+
+export interface PerformanceSnapshot {
+    id: string;
+    scope: PerformanceScope;
+    entityId: string;
+    timestamp: number;
+    totalCurrentValue: number;
+    costBasis?: number;
 }
 
 // Lightweight points for charts after filtering snapshots

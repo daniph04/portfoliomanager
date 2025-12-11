@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { GroupState, Holding, HoldingFormValues, PerformancePoint, Season } from "@/lib/types";
+import { GroupState, Holding, HoldingFormValues, Season } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
 import {
     getMemberHoldings, getTotalPortfolioValue, getTotalPnl, getTotalPnlPercent,
@@ -12,7 +12,7 @@ import { getMetricsForMode, MetricsMode } from "@/lib/portfolioMath";
 import HoldingFormModal from "./HoldingFormModal";
 import SellConfirmModal from "./SellConfirmModal";
 import DonutChart from "./DonutChart";
-import PerformanceChart from "./PerformanceChart";
+import PerformanceChart, { Timeframe } from "./PerformanceChart";
 
 interface MembersTabProps {
     group: GroupState;
@@ -42,6 +42,7 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
     const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [displayMode, setDisplayMode] = useState<MetricsMode>("allTime");
+    const [timeframe, setTimeframe] = useState<Timeframe>("1M");
 
     const selectedMember = selectedMemberId
         ? group.members.find((m) => m.id === selectedMemberId)
@@ -72,24 +73,22 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
         }))
         .sort((a, b) => b.value - a.value);
 
-    const performancePoints: PerformancePoint[] = useMemo(() => {
+    const chartSnapshots = useMemo(() => {
         if (!selectedMember) return [];
-        const raw = group.portfolioHistory.filter(p => (p.entityId || p.memberId) === selectedMember.id);
-        if (raw.length === 0 && metrics) {
-            return [{
-                timestamp: Date.now(),
-                value: metrics.currentValue,
-                scope: "user",
-                entityId: selectedMember.id,
-            }];
+        if (group.portfolioHistory.length > 0) {
+            return group.portfolioHistory.filter(p => (p.entityId || p.memberId) === selectedMember.id);
         }
-        return raw.map(p => ({
-            timestamp: new Date(p.timestamp).getTime(),
-            value: p.totalValue,
-            scope: p.scope === "group" ? "group" : "user",
-            entityId: p.entityId || p.memberId,
-        }));
-    }, [group.portfolioHistory, selectedMember, metrics]);
+        return [{
+            id: `fallback_${selectedMember.id}`,
+            timestamp: Date.now(),
+            memberId: selectedMember.id,
+            totalValue: metrics?.currentValue ?? 0,
+            totalCurrentValue: metrics?.currentValue ?? 0,
+            costBasis: metrics?.baseline ?? 0,
+            scope: "user" as const,
+            entityId: selectedMember.id,
+        }];
+    }, [group.portfolioHistory, metrics?.baseline, metrics?.currentValue, selectedMember]);
 
     const refreshableSymbols = [...new Set(
         memberHoldings
@@ -368,7 +367,7 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                         </div>
 
                         {/* Performance Chart */}
-                        {performancePoints.length > 0 && metrics && (
+                        {metrics && chartSnapshots.length > 0 && (
                             <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4">
                                 <div className="flex items-center justify-between mb-2">
                                     <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
@@ -391,11 +390,15 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                                     </div>
                                 </div>
                                 <PerformanceChart
-                                    points={performancePoints}
-                                    baseline={metrics.baseline}
+                                    snapshots={chartSnapshots}
+                                    scope="user"
+                                    entityId={selectedMember.id}
+                                    timeframe={timeframe}
                                     mode={displayMode}
-                                    startTime={displayMode === "season" && currentSeason ? new Date(currentSeason.startTime).getTime() : undefined}
+                                    seasonBaseline={displayMode === "season" ? metrics.baseline : undefined}
+                                    seasonStart={displayMode === "season" && currentSeason ? new Date(currentSeason.startTime).getTime() : undefined}
                                     showControls
+                                    onTimeframeChange={setTimeframe}
                                     height={200}
                                 />
                             </div>

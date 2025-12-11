@@ -150,7 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isMounted = false;
             subscription.unsubscribe();
         };
-    }, []); // Empty deps - only run once
+    }, [supabase]); // run once per supabase instance
 
     // Sign up
     const signUp = async (email: string, password: string, name: string) => {

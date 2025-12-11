@@ -64,7 +64,11 @@ const getEarliestSnapshotValue = (
         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
     if (filtered.length === 0) return null;
-    return filtered[0].totalValue;
+
+    // Prefer costBasis when available to avoid using mark-to-market as the baseline
+    const first = filtered[0];
+    if (typeof first.costBasis === "number") return first.costBasis;
+    return first.totalValue;
 };
 
 const computeCurrentValue = (member: Member, holdings: Holding[]): number => {
@@ -73,25 +77,28 @@ const computeCurrentValue = (member: Member, holdings: Holding[]): number => {
     return member.cashBalance + investedValue;
 };
 
-const computeBaselineAllTime = (
+const computeAllTimeBaseline = (
     member: Member,
     holdings: Holding[],
     history: PortfolioSnapshot[] = []
 ): number => {
+    // If the member has an explicit baseline, use it (captured at join: cost basis + cash)
     if (member.initialValue !== undefined) return member.initialValue;
     if (member.initialCapital !== undefined) return member.initialCapital;
 
+    // Fall back to earliest recorded snapshot (cost basis preferred)
     const earliestSnapshot = getEarliestSnapshotValue(history, member.id);
     if (earliestSnapshot !== null) return earliestSnapshot;
 
-    const costBasis = holdings
+    // Final fallback: current cost basis + current cash (still cost-based, not market-based)
+    const holdingsCost = holdings
         .filter(h => h.memberId === member.id)
         .reduce((sum, h) => sum + h.quantity * h.avgBuyPrice, 0);
 
-    return member.cashBalance + costBasis;
+    return member.cashBalance + holdingsCost;
 };
 
-const computeBaselineSeason = (
+const computeSeasonBaseline = (
     member: Member,
     holdings: Holding[],
     season: Season | null,
@@ -112,7 +119,7 @@ const computeBaselineSeason = (
     const closest = memberHistory.reduce<{ diff: number; value: number } | null>((best, snap) => {
         const diff = Math.abs(snap.ts - startMs);
         if (!best || diff < best.diff) {
-            return { diff, value: snap.totalValue };
+            return { diff, value: typeof snap.costBasis === "number" ? snap.costBasis : snap.totalValue };
         }
         return best;
     }, null);
@@ -130,8 +137,8 @@ export interface UnifiedMetrics {
     baseline: number;          // Starting point (allTime or season)
     plAbs: number;             // P&L absolute ($)
     plPct: number;             // P&L percentage
-    mode: MetricsMode;         // Which mode these metrics are for
     modeLabel: string;         // "All Time" or season name
+    mode: MetricsMode;         // Which mode these metrics are for
     portfolioValue: number;    // Same as currentValue
     investedValue: number;     // Current value in positions
     cashBalance: number;       // Cash
@@ -149,40 +156,23 @@ export function getMetricsForMode(
     history: PortfolioSnapshot[] = []
 ): UnifiedMetrics {
     const investorMetrics = computeInvestorMetrics(member, holdings);
-
     const currentValue = investorMetrics.portfolioValue;
 
-    const seasonBaseline = computeBaselineSeason(member, holdings, season, history);
-    const allTimeBaseline = computeBaselineAllTime(member, holdings, history);
+    const seasonBaseline = computeSeasonBaseline(member, holdings, season, history);
+    const allTimeBaseline = computeAllTimeBaseline(member, holdings, history);
 
-    if (mode === "season" && season) {
-        const plAbs = currentValue - seasonBaseline;
-        const plPct = seasonBaseline > 0 ? (plAbs / seasonBaseline) * 100 : 0;
-
-        return {
-            currentValue,
-            baseline: seasonBaseline,
-            plAbs,
-            plPct,
-            mode: "season",
-            modeLabel: season.name,
-            portfolioValue: currentValue,
-            investedValue: investorMetrics.investedValue,
-            cashBalance: member.cashBalance,
-        };
-    }
-
-    // All Time mode
-    const plAbs = currentValue - allTimeBaseline;
-    const plPct = allTimeBaseline > 0 ? (plAbs / allTimeBaseline) * 100 : 0;
+    const usingSeason = mode === "season" && !!season;
+    const baseline = usingSeason ? seasonBaseline : allTimeBaseline;
+    const plAbs = currentValue - baseline;
+    const plPct = baseline > 0 ? (plAbs / baseline) * 100 : 0;
 
     return {
         currentValue,
-        baseline: allTimeBaseline,
+        baseline,
         plAbs,
         plPct,
-        mode: "allTime",
-        modeLabel: "All Time",
+        mode: usingSeason ? "season" : "allTime",
+        modeLabel: usingSeason && season ? season.name : "All Time",
         portfolioValue: currentValue,
         investedValue: investorMetrics.investedValue,
         cashBalance: member.cashBalance,

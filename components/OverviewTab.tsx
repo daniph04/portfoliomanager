@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { GroupState, Holding, Season, PerformancePoint } from "@/lib/types";
+import { GroupState, Holding, Season } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
 import {
     getTotalPortfolioValue,
@@ -15,7 +15,7 @@ import {
 } from "@/lib/utils";
 import { ASSET_COLORS } from "@/lib/theme";
 import DonutChart from "./DonutChart";
-import PerformanceChart from "./PerformanceChart";
+import PerformanceChart, { Timeframe } from "./PerformanceChart";
 import { getGroupMetricsForMode, MetricsMode } from "@/lib/portfolioMath";
 
 interface OverviewTabProps {
@@ -29,8 +29,8 @@ const AUTO_REFRESH_INTERVAL = 10 * 1000;
 export default function OverviewTab({ group, helpers }: OverviewTabProps) {
     const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [refreshError, setRefreshError] = useState<string | null>(null);
     const [displayMode, setDisplayMode] = useState<MetricsMode>("allTime");
+    const [timeframe, setTimeframe] = useState<Timeframe>("1M");
 
     // Get current season if active
     const currentSeason = useMemo(() => {
@@ -108,14 +108,19 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
     const topHoldings = aggregatedHoldings.slice(0, 10); // Top 10
 
     // Refresh Logic
-    const stockSymbols = [...new Set(group.holdings.filter(h => h.assetClass === "STOCK" || h.assetClass === "ETF").map(h => h.symbol))];
-    const cryptoSymbols = [...new Set(group.holdings.filter(h => h.assetClass === "CRYPTO").map(h => h.symbol.toLowerCase()))];
+    const stockSymbols = useMemo(
+        () => [...new Set(group.holdings.filter(h => h.assetClass === "STOCK" || h.assetClass === "ETF").map(h => h.symbol))],
+        [group.holdings]
+    );
+    const cryptoSymbols = useMemo(
+        () => [...new Set(group.holdings.filter(h => h.assetClass === "CRYPTO").map(h => h.symbol.toLowerCase()))],
+        [group.holdings]
+    );
 
     const handleRefreshPrices = useCallback(async (showLoading = true) => {
         if (stockSymbols.length === 0 && cryptoSymbols.length === 0) return;
 
         if (showLoading) setIsRefreshing(true);
-        setRefreshError(null);
 
         try {
             const validPrices: Record<string, number> = {};
@@ -154,7 +159,6 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
             }
         } catch (error) {
             console.error(error);
-            setRefreshError("Price refresh failed");
         } finally {
             if (showLoading) setIsRefreshing(false);
         }
@@ -165,38 +169,21 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
         handleRefreshPrices(false);
         const interval = setInterval(() => handleRefreshPrices(false), AUTO_REFRESH_INTERVAL);
         return () => clearInterval(interval);
-    }, [stockSymbols.length, cryptoSymbols.length]);
+    }, [cryptoSymbols.length, handleRefreshPrices, stockSymbols.length]);
 
-    // Must be before early return - groupPoints useMemo
-    const groupPoints = useMemo<PerformancePoint[]>(() => {
-        const raw = group.portfolioHistory.filter(p => (p.scope === "group" && (p.entityId === group.id || p.memberId === "group")));
-        if (raw.length === 0) {
-            // Fallback: aggregate member snapshots by timestamp
-            const grouped = new Map<number, number>();
-            group.portfolioHistory.forEach(s => {
-                const ts = new Date(s.timestamp).getTime();
-                grouped.set(ts, (grouped.get(ts) || 0) + s.totalValue);
-            });
-            const aggregated = Array.from(grouped.entries()).map(([ts, value]) => ({
-                timestamp: ts,
-                value,
-                scope: "group" as const,
-                entityId: group.id,
-            }));
-            return aggregated.length > 0 ? aggregated : [{
-                timestamp: Date.now(),
-                value: metrics.currentValue,
-                scope: "group" as const,
-                entityId: group.id,
-            }];
-        }
-        return raw.map(s => ({
-            timestamp: new Date(s.timestamp).getTime(),
-            value: s.totalValue,
+    const chartSnapshots = useMemo(() => {
+        if (group.portfolioHistory.length > 0) return group.portfolioHistory;
+        return [{
+            id: `fallback_${group.id}`,
+            timestamp: Date.now(),
+            memberId: group.id,
+            totalValue: metrics.currentValue,
+            totalCurrentValue: metrics.currentValue,
+            costBasis: metrics.baseline,
             scope: "group" as const,
             entityId: group.id,
-        }));
-    }, [group.portfolioHistory, group.id, metrics.currentValue]);
+        }];
+    }, [group.id, group.portfolioHistory, metrics.baseline, metrics.currentValue]);
 
     if (group.members.length === 0) {
         return (
@@ -300,11 +287,15 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                     {/* Chart */}
                     <div className="h-64 w-full relative -mx-2">
                         <PerformanceChart
-                            points={groupPoints}
-                            baseline={metrics.baseline}
+                            snapshots={chartSnapshots}
+                            scope="group"
+                            entityId={group.id}
+                            timeframe={timeframe}
                             mode={displayMode}
-                            startTime={displayMode === "season" && currentSeason ? new Date(currentSeason.startTime).getTime() : undefined}
+                            seasonBaseline={displayMode === "season" ? metrics.baseline : undefined}
+                            seasonStart={displayMode === "season" && currentSeason ? new Date(currentSeason.startTime).getTime() : undefined}
                             showControls
+                            onTimeframeChange={setTimeframe}
                         />
                     </div>
                 </div>

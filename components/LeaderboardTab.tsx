@@ -88,22 +88,23 @@ export default function LeaderboardTab({
             const snapshots = group.portfolioHistory
                 .filter(s => (s.entityId || s.memberId) === entry.member.id)
                 .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-                .map(s => ({ timestamp: new Date(s.timestamp).getTime(), value: s.totalValue }));
+                .map(s => ({
+                    timestamp: typeof s.timestamp === "string" ? new Date(s.timestamp).getTime() : s.timestamp,
+                    value: s.totalCurrentValue ?? s.totalValue,
+                }));
 
             const filtered = snapshots.filter(p => p.timestamp >= cutoff);
-            const seasonBaseline = rankingMode === "season" && currentSeason
-                ? (currentSeason.memberSnapshots[entry.member.id] ??
-                    snapshots.find(s => s.timestamp >= new Date(currentSeason.startTime).getTime())?.value ??
-                    entry.baseline)
-                : entry.baseline;
+            const working = filtered.length > 0 ? filtered : snapshots;
+            const fallbackPoint = working[0] ?? { timestamp: now, value: entry.baseline };
 
-            const effectiveBaseline = rankingMode === "allTime" && filtered.length > 0
-                ? filtered[0].value
-                : seasonBaseline;
+            const baseCandidate = rankingMode === "season"
+                ? entry.baseline
+                : working[0]?.value ?? entry.baseline;
+            const base = baseCandidate && baseCandidate > 0 ? baseCandidate : fallbackPoint.value || 1;
 
-            const series = (filtered.length > 0 ? filtered : snapshots.slice(-1)).map(p => ({
+            const series = (working.length > 0 ? working : [fallbackPoint]).map(p => ({
                 timestamp: p.timestamp,
-                pct: effectiveBaseline > 0 ? ((p.value - effectiveBaseline) / effectiveBaseline) * 100 : 0,
+                pct: base > 0 ? ((p.value - base) / base) * 100 : 0,
             }));
 
             if (series.length === 1) {
@@ -138,7 +139,7 @@ export default function LeaderboardTab({
         }
 
         return data;
-    }, [rankings, group.portfolioHistory, chartTimeframe, rankingMode, currentSeason]);
+    }, [rankings, group.portfolioHistory, chartTimeframe, rankingMode]);
 
     // Empty state
     if (group.members.length === 0) {
@@ -193,6 +194,13 @@ export default function LeaderboardTab({
                                 Season
                             </button>
                         </div>
+
+                        {currentSeason && (
+                            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs font-semibold">
+                                <span className="text-[10px] uppercase tracking-wide">Active</span>
+                                <span>{currentSeason.name}</span>
+                            </div>
+                        )}
 
                         {/* Start/End Season Button - only for leader */}
                         {isLeader && !currentSeason && onStartSeason && (

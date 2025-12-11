@@ -81,6 +81,7 @@ const getEventIcon = (type: string) => {
         case "DEPOSIT": return <DepositIcon />;
         case "WITHDRAW": return <WithdrawIcon />;
         case "SEASON_STARTED": return <SeasonIcon />;
+        case "SEASON_ENDED": return <SeasonIcon />;
         case "GROUP_CREATED": return <JoinIcon />;
         case "NOTE": return <NoteIcon />;
         default: return <NoteIcon />;
@@ -146,13 +147,13 @@ export default function ActivityTab({ group }: ActivityTabProps) {
                                 </div>
 
                                 {/* Content */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div className="flex-1">
-                                            {/* Title */}
-                                            <div className="font-semibold text-slate-100">
-                                                {event.title}
-                                            </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex-1">
+                                                {/* Title */}
+                                                <div className="font-semibold text-slate-100">
+                                                    {event.memberId ? `${getMemberName(event.memberId)} · ${event.title}` : event.title}
+                                                </div>
                                             {/* Description */}
                                             {event.description && (
                                                 <div className="text-sm text-slate-400 mt-1">
