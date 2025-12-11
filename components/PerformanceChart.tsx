@@ -258,13 +258,13 @@ export default function PerformanceChart({
 
             {/* Chart */}
             <div className="h-40 sm:h-56 w-full">
-                {data.length <= 1 ? (
+                {data.length === 0 ? (
                     <div className="h-full flex items-center justify-center text-slate-500 text-sm">
                         <div className="text-center">
                             <div className="mb-2">📊</div>
-                            <div>No historical data yet</div>
+                            <div>No data yet</div>
                             <div className="text-xs text-slate-600 mt-1">
-                                Data will be saved over time
+                                Buy/sell or refresh prices to start tracking
                             </div>
                         </div>
                     </div>

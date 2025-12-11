@@ -168,9 +168,7 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                 helpers.updateHoldingPrices(validPrices);
 
                 // Record snapshots for all members after price update
-                group.members.forEach(member => {
-                    helpers.recordPortfolioSnapshot(member.id);
-                });
+                helpers.recordAllMembersSnapshot();
             }
 
             setLastRefresh(new Date());

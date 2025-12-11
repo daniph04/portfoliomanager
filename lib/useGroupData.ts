@@ -71,6 +71,7 @@ export interface GroupDataHelpers {
     // Portfolio history
     getPortfolioHistory: (memberId: string) => PortfolioSnapshot[];
     recordPortfolioSnapshot: (memberId: string) => void;
+    recordAllMembersSnapshot: () => void;
 }
 
 export function usePersistentGroupData(): {
@@ -663,6 +664,48 @@ export function usePersistentGroupData(): {
         }));
     }, [session, appState.groups, updateGroup]);
 
+    // Record snapshots for ALL members in the group (for group chart)
+    const recordAllMembersSnapshot = useCallback(() => {
+        if (!session?.groupId) return;
+
+        const currentGroup = appState.groups.find(g => g.id === session.groupId);
+        if (!currentGroup || currentGroup.members.length === 0) return;
+
+        const now = new Date().toISOString();
+        const newSnapshots: PortfolioSnapshot[] = [];
+
+        // Check if we should skip (less than 30 seconds since last group snapshot)
+        const history = currentGroup.portfolioHistory || [];
+        const lastGroupSnapshot = history.length > 0 ? history[history.length - 1] : null;
+
+        if (lastGroupSnapshot) {
+            const lastTime = new Date(lastGroupSnapshot.timestamp).getTime();
+            const nowTime = new Date(now).getTime();
+            // Skip if less than 30 seconds since last snapshot
+            if (nowTime - lastTime < 30 * 1000) return;
+        }
+
+        // Create a snapshot for each member
+        currentGroup.members.forEach(member => {
+            const memberHoldings = currentGroup.holdings.filter(h => h.memberId === member.id);
+            const holdingsValue = memberHoldings.reduce((sum, h) => sum + (h.quantity * h.currentPrice), 0);
+            const totalValue = member.cashBalance + holdingsValue;
+            const costBasis = memberHoldings.reduce((sum, h) => sum + (h.quantity * h.avgBuyPrice), 0);
+
+            newSnapshots.push({
+                timestamp: now,
+                memberId: member.id,
+                totalValue,
+                costBasis,
+            });
+        });
+
+        updateGroup(session.groupId, prev => ({
+            ...prev,
+            portfolioHistory: [...(prev.portfolioHistory || []), ...newSnapshots],
+        }));
+    }, [session, appState.groups, updateGroup]);
+
     const helpers: GroupDataHelpers = {
         createGroup,
         findGroup,
@@ -683,6 +726,7 @@ export function usePersistentGroupData(): {
         updateHoldingPrices,
         getPortfolioHistory,
         recordPortfolioSnapshot,
+        recordAllMembersSnapshot,
     };
 
     return { group, appState, session, helpers, isLoading };
