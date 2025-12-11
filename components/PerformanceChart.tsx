@@ -120,8 +120,12 @@ export default function PerformanceChart({
         };
 
         if (filteredHistory.length === 0) {
-            // No history - show just the current point
-            return [currentPoint];
+            // No history - show just the current point as a flat line
+            // Duplicate current point to create a visible line
+            return [
+                { ...currentPoint, label: "Start" },
+                currentPoint
+            ];
         }
 
         // Map historical data to chart format
@@ -146,7 +150,15 @@ export default function PerformanceChart({
         });
 
         // Add current value at the end
-        return [...historicalData, currentPoint];
+        const result = [...historicalData, currentPoint];
+
+        // If only 1 historical point + current point = 2 points, that's fine for a line
+        // If somehow we only have 1 point total, duplicate for flat line
+        if (result.length === 1) {
+            return [{ ...result[0], label: "Start" }, result[0]];
+        }
+
+        return result;
     }, [filteredHistory, currentValue, timeRange]);
 
     // Calculate P&L based on visible range
@@ -256,80 +268,68 @@ export default function PerformanceChart({
                 })}
             </div>
 
-            {/* Chart */}
+            {/* Chart - always renders since we ensure at least 2 points */}
             <div className="h-40 sm:h-56 w-full">
-                {data.length === 0 ? (
-                    <div className="h-full flex items-center justify-center text-slate-500 text-sm">
-                        <div className="text-center">
-                            <div className="mb-2">📊</div>
-                            <div>No data yet</div>
-                            <div className="text-xs text-slate-600 mt-1">
-                                Buy/sell or refresh prices to start tracking
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={data}>
-                            <defs>
-                                <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                                    <stop
-                                        offset="5%"
-                                        stopColor={isPositive ? "#00C805" : "#ef4444"}
-                                        stopOpacity={0.4}
-                                    />
-                                    <stop
-                                        offset="95%"
-                                        stopColor={isPositive ? "#00C805" : "#ef4444"}
-                                        stopOpacity={0}
-                                    />
-                                </linearGradient>
-                            </defs>
-                            <XAxis
-                                dataKey="label"
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fill: '#64748b', fontSize: 11 }}
-                                interval="preserveStartEnd"
-                            />
-                            <YAxis
-                                hide
-                                domain={['dataMin - 10', 'dataMax + 10']}
-                            />
-                            <Tooltip
-                                contentStyle={{
-                                    backgroundColor: "#1e293b",
-                                    border: "1px solid #334155",
-                                    borderRadius: "8px",
-                                }}
-                                formatter={(value: number) => [formatCurrencyFull(value), "Value"]}
-                                labelFormatter={(label, payload) => {
-                                    if (payload && payload[0]?.payload?.timestamp) {
-                                        const date = new Date(payload[0].payload.timestamp);
-                                        return date.toLocaleString("en-US", {
-                                            weekday: "short",
-                                            day: "numeric",
-                                            month: "short",
-                                            hour: "2-digit",
-                                            minute: "2-digit",
-                                        });
-                                    }
-                                    return label;
-                                }}
-                                labelStyle={{ color: "#94a3b8" }}
-                            />
-                            <Area
-                                type="monotone"
-                                dataKey="value"
-                                stroke={isPositive ? "#00C805" : "#ef4444"}
-                                strokeWidth={2.5}
-                                fill="url(#colorValue)"
-                                dot={false}
-                                activeDot={{ r: 6, fill: isPositive ? "#00C805" : "#ef4444" }}
-                            />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                )}
+                <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={data}>
+                        <defs>
+                            <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                                <stop
+                                    offset="5%"
+                                    stopColor={isPositive ? "#00C805" : "#ef4444"}
+                                    stopOpacity={0.4}
+                                />
+                                <stop
+                                    offset="95%"
+                                    stopColor={isPositive ? "#00C805" : "#ef4444"}
+                                    stopOpacity={0}
+                                />
+                            </linearGradient>
+                        </defs>
+                        <XAxis
+                            dataKey="label"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: '#64748b', fontSize: 11 }}
+                            interval="preserveStartEnd"
+                        />
+                        <YAxis
+                            hide
+                            domain={['dataMin - 10', 'dataMax + 10']}
+                        />
+                        <Tooltip
+                            contentStyle={{
+                                backgroundColor: "#1e293b",
+                                border: "1px solid #334155",
+                                borderRadius: "8px",
+                            }}
+                            formatter={(value: number) => [formatCurrencyFull(value), "Value"]}
+                            labelFormatter={(label, payload) => {
+                                if (payload && payload[0]?.payload?.timestamp) {
+                                    const date = new Date(payload[0].payload.timestamp);
+                                    return date.toLocaleString("en-US", {
+                                        weekday: "short",
+                                        day: "numeric",
+                                        month: "short",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                    });
+                                }
+                                return label;
+                            }}
+                            labelStyle={{ color: "#94a3b8" }}
+                        />
+                        <Area
+                            type="monotone"
+                            dataKey="value"
+                            stroke={isPositive ? "#00C805" : "#ef4444"}
+                            strokeWidth={2.5}
+                            fill="url(#colorValue)"
+                            dot={false}
+                            activeDot={{ r: 6, fill: isPositive ? "#00C805" : "#ef4444" }}
+                        />
+                    </AreaChart>
+                </ResponsiveContainer>
             </div>
 
             {/* Quick Stats */}

@@ -40,11 +40,38 @@ const NoteIcon = () => (
     </div>
 );
 
+const JoinIcon = () => (
+    <div className="w-10 h-10 rounded-full bg-violet-500/20 flex items-center justify-center">
+        <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+        </svg>
+    </div>
+);
+
+const DepositIcon = () => (
+    <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+        <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+    </div>
+);
+
+const WithdrawIcon = () => (
+    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+        <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+        </svg>
+    </div>
+);
+
 const getEventIcon = (type: string) => {
     switch (type) {
         case "BUY": return <BuyIcon />;
         case "SELL": return <SellIcon />;
         case "UPDATE": return <UpdateIcon />;
+        case "JOIN": return <JoinIcon />;
+        case "DEPOSIT": return <DepositIcon />;
+        case "WITHDRAW": return <WithdrawIcon />;
         case "NOTE": return <NoteIcon />;
         default: return <NoteIcon />;
     }

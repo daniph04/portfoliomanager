@@ -144,110 +144,138 @@ export default function NotificationBell() {
             </button>
 
             {showPopup && (
-                <div className="absolute top-full right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50">
-                    <div className="p-4">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center">
-                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                                    />
-                                </svg>
+                <>
+                    {/* Backdrop */}
+                    <div
+                        className="fixed inset-0 z-40 bg-black/50"
+                        onClick={() => {
+                            setShowPopup(false);
+                            setTestResult(null);
+                        }}
+                    />
+
+                    {/* Bottom Sheet - Mobile Friendly */}
+                    <div
+                        className="fixed inset-x-0 bottom-0 z-50 transform transition-transform duration-300 ease-out"
+                        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+                    >
+                        <div className="bg-slate-900 border-t border-white/10 rounded-t-3xl shadow-2xl max-h-[70vh] overflow-y-auto">
+                            {/* Handle */}
+                            <div className="flex justify-center pt-3 pb-2">
+                                <div className="w-10 h-1 rounded-full bg-slate-600" />
                             </div>
-                            <div>
-                                <h3 className="font-semibold text-white">Push Notifications</h3>
-                                <p className="text-xs text-slate-400">
-                                    {status === "enabled" ? "Active" : "Stay updated"}
-                                </p>
+
+                            <div className="px-4 pb-6">
+                                {/* Header */}
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center">
+                                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                                            />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-white">Push Notifications</h3>
+                                        <p className="text-sm text-slate-400">
+                                            {status === "enabled" ? "Notifications are active" : "Stay updated with your group"}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {status === "enabled" ? (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-3 p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                                            <svg className="w-6 h-6 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                            </svg>
+                                            <span className="text-emerald-400 font-medium">Notifications enabled!</span>
+                                        </div>
+                                        <p className="text-sm text-slate-400">
+                                            You&apos;ll receive alerts when other group members buy, sell, or join.
+                                        </p>
+
+                                        <button
+                                            onClick={handleTestNotification}
+                                            disabled={isTesting}
+                                            className="w-full py-3 bg-white/5 hover:bg-white/10 text-slate-300 font-medium rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                        >
+                                            {isTesting ? (
+                                                <>
+                                                    <div className="w-5 h-5 border-2 border-slate-500 border-t-white rounded-full animate-spin" />
+                                                    Sending...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span>🧪</span>
+                                                    Send Test Notification
+                                                </>
+                                            )}
+                                        </button>
+
+                                        {testResult === "success" && (
+                                            <p className="text-sm text-emerald-400 text-center">✓ Check your notifications!</p>
+                                        )}
+                                        {testResult === "error" && (
+                                            <p className="text-sm text-red-400 text-center">Failed to send. Try again.</p>
+                                        )}
+                                    </div>
+                                ) : status === "denied" ? (
+                                    <div className="space-y-4">
+                                        <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20">
+                                            <p className="text-sm text-amber-400">
+                                                Notifications are blocked in your browser settings.
+                                            </p>
+                                        </div>
+                                        <p className="text-sm text-slate-400">
+                                            To enable, go to your browser settings and allow notifications for this site.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <p className="text-sm text-slate-300 mb-2">
+                                            Get notified when group members:
+                                        </p>
+                                        <ul className="space-y-3">
+                                            <li className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                                                <span className="text-xl">📈</span>
+                                                <span className="text-slate-300">Buy new positions</span>
+                                            </li>
+                                            <li className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                                                <span className="text-xl">📉</span>
+                                                <span className="text-slate-300">Sell holdings</span>
+                                            </li>
+                                            <li className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                                                <span className="text-xl">👋</span>
+                                                <span className="text-slate-300">Join the group</span>
+                                            </li>
+                                        </ul>
+
+                                        <button
+                                            onClick={handleEnableClick}
+                                            disabled={status === "loading"}
+                                            className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-semibold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                                        >
+                                            {status === "loading" ? (
+                                                <>
+                                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                    Enabling...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                                    </svg>
+                                                    Enable Notifications
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
-
-                        {status === "enabled" ? (
-                            <div className="space-y-3">
-                                <div className="flex items-center gap-2 text-emerald-400 text-sm">
-                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                    </svg>
-                                    <span>Notifications enabled!</span>
-                                </div>
-                                <p className="text-xs text-slate-400">
-                                    You&apos;ll receive alerts when other group members buy, sell, or join.
-                                </p>
-
-                                <button
-                                    onClick={handleTestNotification}
-                                    disabled={isTesting}
-                                    className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                                >
-                                    {isTesting ? (
-                                        <>
-                                            <div className="w-4 h-4 border-2 border-slate-500 border-t-white rounded-full animate-spin" />
-                                            Sending...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span>🧪</span>
-                                            Send Test Notification
-                                        </>
-                                    )}
-                                </button>
-
-                                {testResult === "success" && (
-                                    <p className="text-xs text-emerald-400 text-center">✓ Check your notifications!</p>
-                                )}
-                                {testResult === "error" && (
-                                    <p className="text-xs text-red-400 text-center">Failed to send. Try again.</p>
-                                )}
-                            </div>
-                        ) : status === "denied" ? (
-                            <div className="space-y-3">
-                                <p className="text-sm text-slate-300">
-                                    Notifications are blocked in your browser settings.
-                                </p>
-                                <p className="text-xs text-amber-400">
-                                    To enable, go to your browser settings and allow notifications for this site.
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                <p className="text-sm text-slate-300">
-                                    Get notified when group members:
-                                </p>
-                                <ul className="text-xs text-slate-400 space-y-1.5">
-                                    <li className="flex items-center gap-2">
-                                        <span className="text-emerald-400">📈</span> Buy new positions
-                                    </li>
-                                    <li className="flex items-center gap-2">
-                                        <span className="text-red-400">📉</span> Sell holdings
-                                    </li>
-                                    <li className="flex items-center gap-2">
-                                        <span className="text-purple-400">👋</span> Join the group
-                                    </li>
-                                </ul>
-
-                                <button
-                                    onClick={handleEnableClick}
-                                    disabled={status === "loading"}
-                                    className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-medium rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                                >
-                                    {status === "loading" ? (
-                                        <>
-                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                            Enabling...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                                            </svg>
-                                            Enable Notifications
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        )}
                     </div>
-                </div>
+                </>
             )}
         </div>
     );

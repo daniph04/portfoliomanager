@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { GroupState, Holding } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
 import { getTotalPortfolioValue, getTotalPnl, getTotalPnlPercent, getAssetClassBreakdown, formatCurrency, formatPercent, getHoldingPnl, getHoldingPnlPercent, getHoldingValue, getTotalCostBasis } from "@/lib/utils";
+import { ASSET_COLORS } from "@/lib/colors";
 import DonutChart from "./DonutChart";
 import PerformanceChart from "./PerformanceChart";
 
@@ -11,15 +12,6 @@ interface OverviewTabProps {
     group: GroupState;
     helpers: GroupDataHelpers;
 }
-
-// Asset class colors - Robinhood inspired
-const ASSET_COLORS: Record<string, string> = {
-    STOCK: "#00C805",    // Green (Robinhood's signature)
-    CRYPTO: "#F7931A",   // Bitcoin orange
-    ETF: "#5AC8FA",      // Light blue
-    OTHER: "#8E8E93",    // Gray
-    CASH: "#10B981",     // Emerald for cash
-};
 
 // Auto-refresh interval (10 seconds)
 const AUTO_REFRESH_INTERVAL = 10 * 1000;
