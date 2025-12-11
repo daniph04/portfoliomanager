@@ -278,8 +278,24 @@ export default function DashboardPage() {
         }
     };
 
-    const handleEndSeason = () => {
+    const handleEndSeason = async () => {
+        if (!currentSeasonId || !currentGroup || !currentUser) return;
+
+        const endingSeason = seasons.find(s => s.id === currentSeasonId);
+
+        // Log activity event for season end
+        if (addActivity && currentGroup) {
+            await addActivity(
+                currentGroup.id,
+                "SEASON_ENDED",
+                `Ended ${endingSeason?.name || 'season'}`,
+                `${currentUser.name || "Someone"} ended the season`
+            );
+        }
+
+        // Clear current season
         setCurrentSeasonId(undefined);
+        captureSnapshots();
     };
 
     // Adapt helpers to work with Supabase (cast to any to handle async differences)
