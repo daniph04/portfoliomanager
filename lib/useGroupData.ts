@@ -318,20 +318,39 @@ export function usePersistentGroupData(): {
             };
 
             // Create initial snapshot for the new member
+            // IMPORTANT: Use initialCapital as baseline for 0% starting point
+            // This ensures the chart shows gains/losses relative to the starting capital
             const holdingsValue = newHoldings.reduce((sum, h) => sum + (h.quantity * h.currentPrice), 0);
             const totalValue = input.initialCash + holdingsValue;
             const costBasis = newHoldings.reduce((sum, h) => sum + (h.quantity * h.avgBuyPrice), 0);
 
-            const initialSnapshot: PortfolioSnapshot = {
+            // First snapshot: represents the INITIAL state at starting capital
+            // This creates the zero baseline for percentage calculations
+            const baselineSnapshot: PortfolioSnapshot = {
                 timestamp: now,
                 memberId: newMember.id,
-                totalValue,
-                costBasis,
+                totalValue: input.initialCash, // Start at initial capital
+                costBasis: input.initialCash,  // Cost basis = initial capital (0% gain)
             };
+
+            // If user added holdings with current prices different from avg prices,
+            // create a second snapshot showing the current state
+            const snapshots = [baselineSnapshot];
+
+            if (newHoldings.length > 0) {
+                // Add a snapshot 1 second later showing current positions
+                const currentSnapshot: PortfolioSnapshot = {
+                    timestamp: new Date(new Date(now).getTime() + 1000).toISOString(),
+                    memberId: newMember.id,
+                    totalValue,
+                    costBasis: input.initialCash, // Keep initial capital as cost basis for % calculation
+                };
+                snapshots.push(currentSnapshot);
+            }
 
             return {
                 ...updatedGroup,
-                portfolioHistory: [...(prev.portfolioHistory || []), initialSnapshot],
+                portfolioHistory: [...(prev.portfolioHistory || []), ...snapshots],
             };
         });
 

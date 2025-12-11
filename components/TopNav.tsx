@@ -23,7 +23,8 @@ const tabs = [
 export default function TopNav({ currentTab, onTabChange, groupName, currentProfileName }: TopNavProps) {
     const router = useRouter();
     const { groups, currentGroup, setCurrentGroup, signOut, currentUser } = useUser();
-    const [showMenu, setShowMenu] = useState(false);
+    const [showGroupMenu, setShowGroupMenu] = useState(false);
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
 
     const handleLogout = async () => {
         await signOut();
@@ -32,7 +33,7 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
 
     const handleSwitchGroup = (groupId: string) => {
         setCurrentGroup(groupId);
-        setShowMenu(false);
+        setShowGroupMenu(false);
     };
 
     return (
@@ -40,9 +41,9 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
             {/* Top Navigation Bar */}
             <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/5 bg-slate-900/80 safe-area-top">
                 <div className="px-4 h-16 flex items-center justify-between">
-                    {/* Brand / Group Selector */}
+                    {/* Brand / Group Name */}
                     <button
-                        onClick={() => setShowMenu(true)}
+                        onClick={() => setShowGroupMenu(true)}
                         className="flex items-center gap-3 active:opacity-75 transition-opacity"
                     >
                         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20">
@@ -67,9 +68,12 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
                     <div className="flex items-center gap-1">
                         <NotificationBell />
                         <div className="w-px h-6 bg-slate-800 mx-2" />
-                        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-medium text-slate-400">
+                        <button
+                            onClick={() => setShowProfileMenu(true)}
+                            className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-xs font-medium text-slate-400 hover:text-white transition-all active:scale-95"
+                        >
                             {currentUser?.name?.charAt(0) || "U"}
-                        </div>
+                        </button>
                     </div>
                 </div>
             </nav>
@@ -77,22 +81,22 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
             {/* Spacer for fixed header */}
             <div className="h-20" />
 
-            {/* Mobile Menu Bottom Sheet */}
-            {showMenu && (
+            {/* Group Switcher Menu */}
+            {showGroupMenu && (
                 <>
-                    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowMenu(false)} />
+                    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowGroupMenu(false)} />
                     <div className="fixed inset-x-0 bottom-0 z-50 bg-slate-900 rounded-t-2xl border-t border-slate-800 p-6 animate-slide-up safe-area-bottom">
                         <div className="w-12 h-1 bg-slate-700 rounded-full mx-auto mb-6" />
 
                         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Switch Group</h3>
-                        <div className="space-y-2 mb-6">
+                        <div className="space-y-2">
                             {groups.map((group) => (
                                 <button
                                     key={group.id}
                                     onClick={() => handleSwitchGroup(group.id)}
                                     className={`w-full p-4 rounded-xl flex items-center justify-between transition-all ${group.id === currentGroup?.id
-                                            ? "bg-emerald-500/10 border border-emerald-500/50 text-white shadow-[0_0_15px_rgba(16,185,129,0.2)]"
-                                            : "bg-slate-800/50 border border-transparent text-slate-400 hover:bg-slate-800"
+                                        ? "bg-emerald-500/10 border border-emerald-500/50 text-white shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                                        : "bg-slate-800/50 border border-transparent text-slate-400 hover:bg-slate-800"
                                         }`}
                                 >
                                     <span className="font-semibold">{group.name}</span>
@@ -102,18 +106,47 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
                                 </button>
                             ))}
                         </div>
+                    </div>
+                </>
+            )}
 
-                        <div className="grid grid-cols-2 gap-3">
+            {/* Profile Menu */}
+            {showProfileMenu && (
+                <>
+                    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowProfileMenu(false)} />
+                    <div className="fixed inset-x-0 bottom-0 z-50 bg-slate-900 rounded-t-2xl border-t border-slate-800 p-6 animate-slide-up safe-area-bottom">
+                        <div className="w-12 h-1 bg-slate-700 rounded-full mx-auto mb-6" />
+
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg">
+                                {currentUser?.name?.charAt(0) || "U"}
+                            </div>
+                            <div>
+                                <h3 className="text-white font-bold">{currentUser?.name || "User"}</h3>
+                                <p className="text-slate-400 text-sm">{currentProfileName || "No profile"}</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
                             <button
-                                onClick={() => { setShowMenu(false); router.push("/groups"); }}
-                                className="p-3 bg-slate-800 rounded-xl text-slate-300 text-sm font-medium hover:bg-slate-700 transition-colors"
+                                onClick={() => { setShowProfileMenu(false); setShowGroupMenu(true); }}
+                                className="w-full p-4 bg-slate-800/50 hover:bg-slate-800 rounded-xl text-slate-300 text-left font-medium transition-colors flex items-center gap-3"
                             >
-                                + New Group
+                                <span className="text-lg">🔄</span>
+                                Switch Group
+                            </button>
+                            <button
+                                onClick={() => { setShowProfileMenu(false); router.push("/groups"); }}
+                                className="w-full p-4 bg-slate-800/50 hover:bg-slate-800 rounded-xl text-slate-300 text-left font-medium transition-colors flex items-center gap-3"
+                            >
+                                <span className="text-lg">➕</span>
+                                Create New Group
                             </button>
                             <button
                                 onClick={handleLogout}
-                                className="p-3 bg-red-500/10 text-red-400 rounded-xl text-sm font-medium hover:bg-red-500/20 transition-colors"
+                                className="w-full p-4 bg-red-500/10 hover:bg-red-500/20 rounded-xl text-red-400 text-left font-medium transition-colors flex items-center gap-3"
                             >
+                                <span className="text-lg">🚪</span>
                                 Log Out
                             </button>
                         </div>

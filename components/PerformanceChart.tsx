@@ -25,6 +25,7 @@ export default function PerformanceChart({
     showControls = true,
 }: PerformanceChartProps) {
     const [timeRange, setTimeRange] = useState<TimeRange>("1W");
+    const [showPercentage, setShowPercentage] = useState(true);
 
     // Filter and aggregate history
     const chartData = useMemo(() => {
@@ -42,19 +43,12 @@ export default function PerformanceChart({
         // 1. Filter by member if needed
         let history = memberId
             ? portfolioHistory.filter(s => s.memberId === memberId)
-            : portfolioHistory; // usage for group would need pre-aggregated data passed in, or we aggregate here.
-
-        // If memberId is NOT provided, we assume we are given raw snapshots for ALL members and need to aggregate them by time?
-        // OR the parent component passes pre-aggregated milestones?
-        // Let's assume for GROUP view, the parent passes aggregated snapshots OR `memberId` is undefined and we aggregate here.
-        // The implementation in useGroupData records individual snapshots. So we must aggregate here if memberId is missing.
+            : portfolioHistory;
 
         if (!memberId) {
-            // Group aggregation
-            // Group snapshots by timestamp (approximate to minute)
+            // Group aggregation - sum all members' values at each timestamp
             const grouped = new Map<string, number>();
             history.forEach(s => {
-                // Round to minute to group concurrent updates
                 const timeKey = new Date(s.timestamp).setSeconds(0, 0);
                 grouped.set(timeKey.toString(), (grouped.get(timeKey.toString()) || 0) + s.totalValue);
             });
@@ -63,7 +57,7 @@ export default function PerformanceChart({
                 timestamp: new Date(parseInt(ts)).toISOString(),
                 totalValue: val,
                 memberId: "group",
-                costBasis: 0 // Not strictly needed for the chart line
+                costBasis: initialCapital // Use group initial capital
             })).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
         } else {
             history = history.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
@@ -76,34 +70,43 @@ export default function PerformanceChart({
         const currentPoint = {
             timestamp: now.toISOString(),
             totalValue: currentValue,
-            costBasis: 0,
+            costBasis: initialCapital,
             memberId: memberId || "group",
+            percentChange: initialCapital > 0 ? ((currentValue - initialCapital) / initialCapital) * 100 : 0,
         };
 
-        // If no history, just show start -> now flat line
+        // If no history, create baseline
         if (filtered.length === 0) {
-            // If ALL, show mostly flat from initial capital
-            if (timeRange === "ALL" && initialCapital > 0) {
-                return [
-                    { ...currentPoint, timestamp: cutoffTime.toISOString(), totalValue: initialCapital },
-                    currentPoint
-                ];
-            }
-            // Otherwise just a flat line of current value
-            return [
-                { ...currentPoint, timestamp: new Date(now.getTime() - 3600000).toISOString() }, // 1h ago
-                currentPoint
-            ];
+            const startPoint = {
+                timestamp: new Date(now.getTime() - 3600000).toISOString(),
+                totalValue: initialCapital,
+                costBasis: initialCapital,
+                memberId: memberId || "group",
+                percentChange: 0,
+            };
+            return [startPoint, currentPoint];
         }
 
-        return [...filtered, currentPoint];
+        // Calculate percentage change for each point relative to initial capital
+        const dataWithPercent = filtered.map(point => ({
+            ...point,
+            percentChange: initialCapital > 0
+                ? ((point.totalValue - initialCapital) / initialCapital) * 100
+                : 0,
+        }));
+
+        return [...dataWithPercent, currentPoint];
     }, [portfolioHistory, memberId, timeRange, currentValue, initialCapital]);
 
-    // Calculate variations for display
+    // Calculate variations for display (based on time range, not all-time)
     const startValue = chartData.length > 0 ? chartData[0].totalValue : initialCapital;
     const changeValue = currentValue - startValue;
     const changePercent = startValue > 0 ? (changeValue / startValue) * 100 : 0;
     const isPositive = changeValue >= 0;
+
+    // Total return from initial capital
+    const totalReturn = currentValue - initialCapital;
+    const totalReturnPercent = initialCapital > 0 ? (totalReturn / initialCapital) * 100 : 0;
 
     // Theme colors
     const color = isPositive ? "#10b981" : "#ef4444"; // emerald-500 : red-500
@@ -133,13 +136,26 @@ export default function PerformanceChart({
                                 <stop offset="95%" stopColor={color} stopOpacity={0} />
                             </linearGradient>
                         </defs>
+                        <YAxis
+                            hide={false}
+                            domain={['auto', 'auto']}
+                            tickFormatter={(value) => showPercentage
+                                ? `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`
+                                : formatCurrency(value, 0)
+                            }
+                            stroke="#64748b"
+                            style={{ fontSize: '11px' }}
+                            width={50}
+                        />
+                        <XAxis hide={true} />
                         <Tooltip
                             content={({ active, payload }) => {
                                 if (active && payload && payload.length) {
                                     const data = payload[0].payload;
                                     const date = new Date(data.timestamp);
+                                    const pct = data.percentChange || 0;
                                     return (
-                                        <div className="bg-slate-900 border border-slate-700 p-2 rounded-lg shadow-xl">
+                                        <div className="bg-slate-900 border border-slate-700 p-3 rounded-lg shadow-xl">
                                             <p className="text-slate-400 text-xs mb-1">
                                                 {date.toLocaleString(undefined, {
                                                     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -147,6 +163,9 @@ export default function PerformanceChart({
                                             </p>
                                             <p className="text-white font-bold">
                                                 {formatCurrency(data.totalValue)}
+                                            </p>
+                                            <p className={`text-xs font-medium mt-1 ${pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                {pct >= 0 ? '+' : ''}{formatPercent(pct)} from start
                                             </p>
                                         </div>
                                     );
@@ -156,15 +175,15 @@ export default function PerformanceChart({
                         />
                         <Area
                             type="monotone"
-                            dataKey="totalValue"
+                            dataKey={showPercentage ? "percentChange" : "totalValue"}
                             stroke={color}
                             strokeWidth={3}
                             fill="url(#chartColor)"
                             animationDuration={1000}
                         />
-                        {/* Baseline (Initial Capital) for reference only if ALL */}
-                        {timeRange === "ALL" && (
-                            <ReferenceLine y={initialCapital} stroke="#334155" strokeDasharray="3 3" />
+                        {/* Zero line reference */}
+                        {showPercentage && (
+                            <ReferenceLine y={0} stroke="#475569" strokeDasharray="3 3" strokeWidth={1} />
                         )}
                     </AreaChart>
                 </ResponsiveContainer>
@@ -172,22 +191,30 @@ export default function PerformanceChart({
 
             {/* Time Controls */}
             {showControls && (
-                <div className="flex justify-between mt-4">
-                    {(["1D", "1W", "1M", "1Y", "ALL"] as TimeRange[]).map((r) => (
-                        <button
-                            key={r}
-                            onClick={() => setTimeRange(r)}
-                            className={`
-                                px-4 py-2 rounded-full text-xs font-bold transition-all
-                                ${timeRange === r
-                                    ? "bg-slate-800 text-white shadow-lg"
-                                    : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/50"
-                                }
-                            `}
-                        >
-                            {r}
-                        </button>
-                    ))}
+                <div className="flex justify-between items-center mt-4">
+                    <div className="flex gap-1">
+                        {(["1D", "1W", "1M", "1Y"] as TimeRange[]).map((r) => (
+                            <button
+                                key={r}
+                                onClick={() => setTimeRange(r)}
+                                className={`
+                                    px-3 py-1.5 rounded-lg text-xs font-bold transition-all
+                                    ${timeRange === r
+                                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50"
+                                        : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/50"
+                                    }
+                                `}
+                            >
+                                {r}
+                            </button>
+                        ))}
+                    </div>
+                    <button
+                        onClick={() => setShowPercentage(!showPercentage)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-300 hover:bg-slate-800/50 transition-all"
+                    >
+                        {showPercentage ? "%" : "$"}
+                    </button>
                 </div>
             )}
         </div>

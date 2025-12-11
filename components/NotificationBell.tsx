@@ -21,11 +21,17 @@ export default function NotificationBell() {
             return;
         }
 
-        if (Notification.permission === "granted") {
+        // Check if user has explicitly enabled notifications in THIS app
+        const appNotificationsEnabled = localStorage.getItem('portfolio_notifications_enabled');
+
+        if (Notification.permission === "granted" && appNotificationsEnabled === 'true') {
             setStatus("enabled");
             setupListeners();
         } else if (Notification.permission === "denied") {
             setStatus("denied");
+        } else {
+            // Default to idle - user needs to explicitly enable
+            setStatus("idle");
         }
     }, []);
 
@@ -74,6 +80,10 @@ export default function NotificationBell() {
             }
 
             await saveFcmToken(token, currentUser.id, currentGroup.id);
+
+            // Save flag that user has enabled notifications in this app
+            localStorage.setItem('portfolio_notifications_enabled', 'true');
+
             setStatus("enabled");
             await setupListeners();
         } catch (err) {
