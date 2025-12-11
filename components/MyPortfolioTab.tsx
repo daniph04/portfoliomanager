@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { GroupState, Holding, PortfolioSnapshot } from "@/lib/types";
+import { useState, useMemo } from "react";
+import { GroupState, Holding, PortfolioSnapshot, Season } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
 import { formatCurrency, formatPercent, getMemberColor, getHoldingPnl, getHoldingPnlPercent, getTotalCostBasis, getMemberHoldings, getTotalPortfolioValue } from "@/lib/utils";
+import { getMetricsForMode, MetricsMode } from "@/lib/portfolioMath";
 import HoldingFormModal from "./HoldingFormModal";
 import DonutChart from "./DonutChart";
 import PerformanceChart from "./PerformanceChart";
@@ -30,10 +31,17 @@ export default function MyPortfolioTab({
     const [modalMode, setModalMode] = useState<"create" | "edit">("create");
     const [editingHolding, setEditingHolding] = useState<Holding | null>(null);
     const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
+    const [displayMode, setDisplayMode] = useState<MetricsMode>("allTime");
 
     // Get current user's data
     const currentMember = group.members.find(m => m.id === currentProfileId);
     const myHoldings = getMemberHoldings(group.holdings, currentProfileId);
+
+    // Get current season if active
+    const currentSeason = useMemo(() => {
+        if (!group.currentSeasonId) return null;
+        return group.seasons.find(s => s.id === group.currentSeasonId) || null;
+    }, [group.currentSeasonId, group.seasons]);
 
     if (!currentMember) {
         return (
@@ -44,33 +52,12 @@ export default function MyPortfolioTab({
         );
     }
 
+    // Use unified metrics for P&L calculations
+    const metrics = getMetricsForMode(currentMember, group.holdings, currentSeason, displayMode);
+
+    // For chart and donut
     const totalHoldingsValue = getTotalPortfolioValue(myHoldings);
     const investedAmount = getTotalCostBasis(myHoldings);
-    const totalValue = totalHoldingsValue + cashBalance;
-
-    // Calculate initial capital - if not set, compute from current cash + cost basis of positions
-    // This handles legacy profiles that were created before initialCapital was tracked
-    const rawInitialCapital = currentMember.initialCapital;
-    const computedInitialCapital = rawInitialCapital && rawInitialCapital > 0
-        ? rawInitialCapital
-        : (cashBalance + investedAmount); // Fallback: assume starting capital was cash + what was invested
-
-    // REAL Total Return = currentValue - initialCapital
-    // This is the PROFIT/LOSS from the starting point
-    const unrealizedPL = totalHoldingsValue - investedAmount; // Pure position gains
-
-    // Use initialCapital for proper return calculation
-    // If initialCapital isn't set properly, show unrealizedPL as the P/L
-    const hasValidInitialCapital = rawInitialCapital && rawInitialCapital > 0;
-    const totalPnl = hasValidInitialCapital
-        ? (totalValue - rawInitialCapital)
-        : unrealizedPL; // Fallback to unrealized P/L
-    const totalReturnPercent = hasValidInitialCapital && rawInitialCapital > 0
-        ? (totalPnl / rawInitialCapital) * 100
-        : (investedAmount > 0 ? (unrealizedPL / investedAmount) * 100 : 0);
-
-    // Day P/L (mock for now, or could be calculated if we had yesterday's close)
-    // For now, we focus on Total P/L as the primary metric
 
     // Chart data
     const assetAllocation = myHoldings.reduce((acc, h) => {
@@ -139,7 +126,7 @@ export default function MyPortfolioTab({
                 />
 
                 <div className="relative p-6 z-10">
-                    <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-4">
                             <div className="relative">
                                 <div
@@ -155,7 +142,7 @@ export default function MyPortfolioTab({
                             <div>
                                 <h2 className="text-xl font-bold text-white tracking-tight">{currentMember.name}</h2>
                                 <div className="flex items-center gap-2 text-sm text-slate-400">
-                                    <span>Initial: {formatCurrency(computedInitialCapital, 0)}</span>
+                                    <span>{metrics.modeLabel}: {formatCurrency(metrics.baseline, 0)}</span>
                                 </div>
                             </div>
                         </div>
@@ -168,20 +155,44 @@ export default function MyPortfolioTab({
                         </button>
                     </div>
 
+                    {/* Mode Toggle */}
+                    {currentSeason && (
+                        <div className="flex gap-1 mb-4 bg-slate-800/50 rounded-lg p-1 w-fit">
+                            <button
+                                onClick={() => setDisplayMode("season")}
+                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === "season"
+                                    ? "bg-amber-500/20 text-amber-400"
+                                    : "text-slate-500 hover:text-slate-300"
+                                    }`}
+                            >
+                                {currentSeason.name}
+                            </button>
+                            <button
+                                onClick={() => setDisplayMode("allTime")}
+                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === "allTime"
+                                    ? "bg-emerald-500/20 text-emerald-400"
+                                    : "text-slate-500 hover:text-slate-300"
+                                    }`}
+                            >
+                                All Time
+                            </button>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-8">
                         <div>
                             <div className="text-sm text-slate-400 font-medium mb-1">Portfolio Value</div>
                             <div className="text-3xl font-bold text-white tracking-tight">
-                                {formatCurrency(totalValue)}
+                                {formatCurrency(metrics.currentValue)}
                             </div>
                         </div>
                         <div className="text-right">
-                            <div className="text-sm text-slate-400 font-medium mb-1">Total Return</div>
-                            <div className={`text-3xl font-bold tracking-tight ${totalPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                {totalPnl >= 0 ? "+" : ""}{formatCurrency(totalPnl)}
+                            <div className="text-sm text-slate-400 font-medium mb-1">{metrics.modeLabel} Return</div>
+                            <div className={`text-3xl font-bold tracking-tight ${metrics.plAbs >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                {metrics.plAbs >= 0 ? "+" : ""}{formatCurrency(metrics.plAbs)}
                             </div>
-                            <div className={`text-sm font-medium ${totalPnl >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                                {totalPnl >= 0 ? "▲" : "▼"} {formatPercent(totalReturnPercent)}
+                            <div className={`text-sm font-medium ${metrics.plAbs >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                                {metrics.plAbs >= 0 ? "▲" : "▼"} {formatPercent(Math.abs(metrics.plPct))}
                             </div>
                         </div>
                     </div>
@@ -192,10 +203,13 @@ export default function MyPortfolioTab({
                     <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-900 to-transparent z-10" />
                     <PerformanceChart
                         portfolioHistory={memberHistory}
-                        currentValue={totalValue}
-                        initialCapital={computedInitialCapital}
+                        currentValue={metrics.currentValue}
+                        initialCapital={metrics.baseline}
                         memberId={currentProfileId}
                         showControls={true}
+                        currentSeason={currentSeason}
+                        seasonInitialValue={currentSeason ? currentSeason.memberSnapshots[currentProfileId] : undefined}
+                        showModeToggle={false}
                     />
                 </div>
             </div>
@@ -238,7 +252,7 @@ export default function MyPortfolioTab({
                             <DonutChart
                                 data={chartData}
                                 centerLabel="Assets"
-                                centerValue={formatCurrency(totalValue, 0)}
+                                centerValue={formatCurrency(metrics.currentValue, 0)}
                                 highlightedCategory={highlightedCategory}
                                 onHoverCategory={setHighlightedCategory}
                                 size={220}
@@ -260,7 +274,7 @@ export default function MyPortfolioTab({
                                         </span>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-sm font-bold text-white">{((item.value / totalValue) * 100).toFixed(1)}%</div>
+                                        <div className="text-sm font-bold text-white">{((item.value / metrics.currentValue) * 100).toFixed(1)}%</div>
                                         <div className="text-[10px] text-slate-500">{formatCurrency(item.value, 0)}</div>
                                     </div>
                                 </div>

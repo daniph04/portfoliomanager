@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { GroupState, Holding } from "@/lib/types";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { GroupState, Holding, Season } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
 import {
     getTotalPortfolioValue,
@@ -16,7 +16,7 @@ import {
 import { ASSET_COLORS } from "@/lib/theme";
 import DonutChart from "./DonutChart";
 import PerformanceChart from "./PerformanceChart";
-import { computeGroupMetrics } from "@/lib/portfolioMath";
+import { getGroupMetricsForMode, MetricsMode } from "@/lib/portfolioMath";
 
 interface OverviewTabProps {
     group: GroupState;
@@ -30,9 +30,16 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
     const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [refreshError, setRefreshError] = useState<string | null>(null);
+    const [displayMode, setDisplayMode] = useState<MetricsMode>("allTime");
 
-    // Compute comprehensive group metrics
-    const metrics = computeGroupMetrics(group);
+    // Get current season if active
+    const currentSeason = useMemo(() => {
+        if (!group.currentSeasonId) return null;
+        return group.seasons.find(s => s.id === group.currentSeasonId) || null;
+    }, [group.currentSeasonId, group.seasons]);
+
+    // Compute comprehensive group metrics based on display mode
+    const metrics = getGroupMetricsForMode(group, currentSeason, displayMode);
 
     // Asset allocation breakdown (Invested assets only)
     const assetBreakdown = getAssetClassBreakdown(group.holdings);
@@ -203,26 +210,50 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                         )}
                     </div>
 
+                    {/* Mode Toggle */}
+                    {currentSeason && (
+                        <div className="flex gap-1 mb-6 bg-slate-800/50 rounded-lg p-1 w-fit">
+                            <button
+                                onClick={() => setDisplayMode("season")}
+                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === "season"
+                                        ? "bg-amber-500/20 text-amber-400"
+                                        : "text-slate-500 hover:text-slate-300"
+                                    }`}
+                            >
+                                {currentSeason.name}
+                            </button>
+                            <button
+                                onClick={() => setDisplayMode("allTime")}
+                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === "allTime"
+                                        ? "bg-emerald-500/20 text-emerald-400"
+                                        : "text-slate-500 hover:text-slate-300"
+                                    }`}
+                            >
+                                All Time
+                            </button>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
                         <div>
                             <div className="text-sm text-slate-500 font-bold uppercase tracking-wider mb-1">AUM</div>
                             <div className="text-4xl font-bold text-white tracking-tight">
-                                {formatCurrency(metrics.groupCurrentValue)}
+                                {formatCurrency(metrics.currentValue)}
                             </div>
                         </div>
                         <div>
-                            <div className="text-sm text-slate-500 font-bold uppercase tracking-wider mb-1">Total Return</div>
-                            <div className={`text-4xl font-bold tracking-tight ${metrics.groupPL >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                {metrics.groupPL >= 0 ? "+" : ""}{formatCurrency(metrics.groupPL)}
+                            <div className="text-sm text-slate-500 font-bold uppercase tracking-wider mb-1">{metrics.modeLabel} Return</div>
+                            <div className={`text-4xl font-bold tracking-tight ${metrics.plAbs >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                {metrics.plAbs >= 0 ? "+" : ""}{formatCurrency(metrics.plAbs)}
                             </div>
-                            <div className={`text-sm font-bold mt-1 ${metrics.groupPL >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                                {metrics.groupPL >= 0 ? "▲" : "▼"} {formatPercent(metrics.groupPLPct)}
+                            <div className={`text-sm font-bold mt-1 ${metrics.plAbs >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                                {metrics.plAbs >= 0 ? "▲" : "▼"} {formatPercent(Math.abs(metrics.plPct))}
                             </div>
                         </div>
                         <div className="md:text-right">
                             <div className="text-sm text-slate-500 font-bold uppercase tracking-wider mb-1">Cash Ratio</div>
                             <div className="text-4xl font-bold text-white tracking-tight">
-                                {formatPercent((totalGroupCash / metrics.groupCurrentValue) * 100)}
+                                {formatPercent((totalGroupCash / metrics.currentValue) * 100)}
                             </div>
                             <div className="text-sm text-slate-500 mt-1">
                                 {formatCurrency(totalGroupCash)} available
@@ -233,11 +264,12 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                     {/* Chart */}
                     <div className="h-64 w-full relative -mx-2">
                         <PerformanceChart
-                            portfolioHistory={group.portfolioHistory} // Group history contains aggregate if tracked, or distinct. 
-                            // Note: If memberId is undefined, PerformanceChart aggregates raw history.
-                            currentValue={metrics.groupCurrentValue}
-                            initialCapital={metrics.groupInitialCapital}
+                            portfolioHistory={group.portfolioHistory}
+                            currentValue={metrics.currentValue}
+                            initialCapital={metrics.baseline}
                             showControls={true}
+                            currentSeason={currentSeason}
+                            showModeToggle={false}
                         />
                     </div>
                 </div>
@@ -253,7 +285,7 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                         <DonutChart
                             data={chartData}
                             centerLabel="Total AUM"
-                            centerValue={formatCurrency(metrics.groupCurrentValue, 0)}
+                            centerValue={formatCurrency(metrics.currentValue, 0)}
                             highlightedCategory={highlightedCategory}
                             onHoverCategory={setHighlightedCategory}
                             size={220}
@@ -275,7 +307,7 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                                         {item.name === "STOCK" ? "Stocks" : item.name === "CRYPTO" ? "Crypto" : item.name}
                                     </span>
                                 </div>
-                                <span className="text-sm font-bold text-white">{((item.value / metrics.groupCurrentValue) * 100).toFixed(1)}%</span>
+                                <span className="text-sm font-bold text-white">{((item.value / metrics.currentValue) * 100).toFixed(1)}%</span>
                             </div>
                         ))}
                     </div>

@@ -157,3 +157,109 @@ export function computeGroupSeasonMetrics(group: GroupState, season: Season | nu
         groupSeasonPLPct,
     };
 }
+
+/**
+ * Display mode for P&L calculations
+ */
+export type MetricsMode = "allTime" | "season";
+
+/**
+ * Unified metrics interface for consistent UI display
+ */
+export interface UnifiedMetrics {
+    currentValue: number;      // Portfolio value right now
+    baseline: number;          // Starting point (allTime or season)
+    plAbs: number;             // P&L absolute ($)
+    plPct: number;             // P&L percentage
+    mode: MetricsMode;         // Which mode these metrics are for
+    modeLabel: string;         // "All Time" or season name
+    // For charts
+    portfolioValue: number;    // Same as currentValue
+    investedValue: number;     // Current value in positions
+    cashBalance: number;       // Cash
+}
+
+/**
+ * Get unified metrics for a member based on display mode.
+ * This is the single source of truth for P&L calculations.
+ */
+export function getMetricsForMode(
+    member: Member,
+    holdings: Holding[],
+    season: Season | null,
+    mode: MetricsMode
+): UnifiedMetrics {
+    const investorMetrics = computeInvestorMetrics(member, holdings);
+
+    const currentValue = investorMetrics.portfolioValue;
+
+    if (mode === "season" && season) {
+        const seasonInitial = season.memberSnapshots[member.id] ?? currentValue;
+        const plAbs = currentValue - seasonInitial;
+        const plPct = seasonInitial > 0 ? (plAbs / seasonInitial) * 100 : 0;
+
+        return {
+            currentValue,
+            baseline: seasonInitial,
+            plAbs,
+            plPct,
+            mode: "season",
+            modeLabel: season.name,
+            portfolioValue: currentValue,
+            investedValue: investorMetrics.investedValue,
+            cashBalance: member.cashBalance,
+        };
+    }
+
+    // All Time mode
+    const allTimeBaseline = investorMetrics.startCapital;
+    const plAbs = currentValue - allTimeBaseline;
+    const plPct = allTimeBaseline > 0 ? (plAbs / allTimeBaseline) * 100 : 0;
+
+    return {
+        currentValue,
+        baseline: allTimeBaseline,
+        plAbs,
+        plPct,
+        mode: "allTime",
+        modeLabel: "All Time",
+        portfolioValue: currentValue,
+        investedValue: investorMetrics.investedValue,
+        cashBalance: member.cashBalance,
+    };
+}
+
+/**
+ * Get unified metrics for the entire group based on display mode.
+ */
+export function getGroupMetricsForMode(
+    group: GroupState,
+    season: Season | null,
+    mode: MetricsMode
+): UnifiedMetrics & { memberCount: number; totalCash: number } {
+    const memberMetrics = group.members.map(m =>
+        getMetricsForMode(m, group.holdings, season, mode)
+    );
+
+    const currentValue = memberMetrics.reduce((sum, m) => sum + m.currentValue, 0);
+    const baseline = memberMetrics.reduce((sum, m) => sum + m.baseline, 0);
+    const totalCash = memberMetrics.reduce((sum, m) => sum + m.cashBalance, 0);
+    const investedValue = memberMetrics.reduce((sum, m) => sum + m.investedValue, 0);
+
+    const plAbs = currentValue - baseline;
+    const plPct = baseline > 0 ? (plAbs / baseline) * 100 : 0;
+
+    return {
+        currentValue,
+        baseline,
+        plAbs,
+        plPct,
+        mode,
+        modeLabel: mode === "season" && season ? season.name : "All Time",
+        portfolioValue: currentValue,
+        investedValue,
+        cashBalance: totalCash,
+        memberCount: group.members.length,
+        totalCash,
+    };
+}
