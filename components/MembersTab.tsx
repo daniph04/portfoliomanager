@@ -352,11 +352,11 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
 
                             {/* Stats Grid */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {selectedMember.startingCapital && (
+                                {selectedMember.initialCapital && (
                                     <div className="bg-slate-800/50 rounded-xl p-3">
                                         <div className="text-xs text-slate-500 uppercase">Starting Capital</div>
                                         <div className="text-lg font-bold text-slate-200">
-                                            {formatCurrency(selectedMember.startingCapital, 0)}
+                                            {formatCurrency(selectedMember.initialCapital, 0)}
                                         </div>
                                     </div>
                                 )}
