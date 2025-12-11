@@ -198,18 +198,19 @@ export default function MyPortfolioTab({
                     </div>
                 </div>
 
-                {/* Mini Chart Area */}
-                <div className="h-48 w-full mt-2 relative">
-                    <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-900 to-transparent z-10" />
+                {/* Chart Area - bigger and without overlay covering controls */}
+                <div className="px-4 pb-6">
                     <PerformanceChart
                         portfolioHistory={memberHistory}
                         currentValue={metrics.currentValue}
                         initialCapital={metrics.baseline}
                         memberId={currentProfileId}
                         showControls={true}
+                        showHeader={false}
                         currentSeason={currentSeason}
                         seasonInitialValue={currentSeason ? currentSeason.memberSnapshots[currentProfileId] : undefined}
                         showModeToggle={false}
+                        className="h-64"
                     />
                 </div>
             </div>

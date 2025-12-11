@@ -15,6 +15,7 @@ interface PerformanceChartProps {
     memberId?: string; // If provided, filters for specific member
     className?: string;
     showControls?: boolean;
+    showHeader?: boolean; // Whether to show the value header (set false when embedded)
     // Season-related props
     currentSeason?: Season | null;
     seasonInitialValue?: number; // Portfolio value at season start for this member
@@ -28,6 +29,7 @@ export default function PerformanceChart({
     memberId,
     className = "",
     showControls = true,
+    showHeader = true,
     currentSeason,
     seasonInitialValue,
     showModeToggle = false,
@@ -145,17 +147,19 @@ export default function PerformanceChart({
 
     return (
         <div className={`w-full ${className}`}>
-            {/* Header / Stats */}
-            <div className="mb-4">
-                <div className="text-3xl font-bold text-white tracking-tight">
-                    {formatCurrency(currentValue)}
+            {/* Header / Stats - only show if showHeader is true */}
+            {showHeader && (
+                <div className="mb-4">
+                    <div className="text-3xl font-bold text-white tracking-tight">
+                        {formatCurrency(currentValue)}
+                    </div>
+                    <div className={`flex items-center gap-2 text-sm font-medium ${isTotalPositive ? "text-emerald-400" : "text-red-400"}`}>
+                        <span>{isTotalPositive ? "▲" : "▼"} {formatCurrency(Math.abs(totalReturn))}</span>
+                        <span>({isTotalPositive ? "+" : ""}{formatPercent(totalReturnPercent)})</span>
+                        <span className="text-slate-500 font-normal ml-1">{modeLabel}</span>
+                    </div>
                 </div>
-                <div className={`flex items-center gap-2 text-sm font-medium ${isTotalPositive ? "text-emerald-400" : "text-red-400"}`}>
-                    <span>{isTotalPositive ? "▲" : "▼"} {formatCurrency(Math.abs(totalReturn))}</span>
-                    <span>({isTotalPositive ? "+" : ""}{formatPercent(totalReturnPercent)})</span>
-                    <span className="text-slate-500 font-normal ml-1">{modeLabel}</span>
-                </div>
-            </div>
+            )}
 
             {/* Mode Toggle (Season / All Time) */}
             {showModeToggle && currentSeason && (
