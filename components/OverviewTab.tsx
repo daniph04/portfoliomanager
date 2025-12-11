@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { GroupState, Holding, Season } from "@/lib/types";
+import { GroupState, Holding, Season, PerformancePoint } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
 import {
     getTotalPortfolioValue,
@@ -39,13 +39,14 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
     }, [group.currentSeasonId, group.seasons]);
 
     // Compute comprehensive group metrics based on display mode
-    const metrics = getGroupMetricsForMode(group, currentSeason, displayMode);
+    const metrics = getGroupMetricsForMode(group, currentSeason, displayMode, group.portfolioHistory);
 
     // Asset allocation breakdown (Invested assets only)
     const assetBreakdown = getAssetClassBreakdown(group.holdings);
 
     // Total CASH in the group
     const totalGroupCash = group.members.reduce((sum, m) => sum + m.cashBalance, 0);
+    const cashRatio = metrics.currentValue > 0 ? (totalGroupCash / metrics.currentValue) * 100 : 0;
 
     // Chart data 
     const chartData = Object.entries(assetBreakdown)
@@ -166,6 +167,37 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
         return () => clearInterval(interval);
     }, [stockSymbols.length, cryptoSymbols.length]);
 
+    // Must be before early return - groupPoints useMemo
+    const groupPoints = useMemo<PerformancePoint[]>(() => {
+        const raw = group.portfolioHistory.filter(p => (p.scope === "group" && (p.entityId === group.id || p.memberId === "group")));
+        if (raw.length === 0) {
+            // Fallback: aggregate member snapshots by timestamp
+            const grouped = new Map<number, number>();
+            group.portfolioHistory.forEach(s => {
+                const ts = new Date(s.timestamp).getTime();
+                grouped.set(ts, (grouped.get(ts) || 0) + s.totalValue);
+            });
+            const aggregated = Array.from(grouped.entries()).map(([ts, value]) => ({
+                timestamp: ts,
+                value,
+                scope: "group" as const,
+                entityId: group.id,
+            }));
+            return aggregated.length > 0 ? aggregated : [{
+                timestamp: Date.now(),
+                value: metrics.currentValue,
+                scope: "group" as const,
+                entityId: group.id,
+            }];
+        }
+        return raw.map(s => ({
+            timestamp: new Date(s.timestamp).getTime(),
+            value: s.totalValue,
+            scope: "group" as const,
+            entityId: group.id,
+        }));
+    }, [group.portfolioHistory, group.id, metrics.currentValue]);
+
     if (group.members.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center h-96 text-slate-500">
@@ -211,28 +243,27 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                     </div>
 
                     {/* Mode Toggle */}
-                    {currentSeason && (
-                        <div className="flex gap-1 mb-6 bg-slate-800/50 rounded-lg p-1 w-fit">
-                            <button
-                                onClick={() => setDisplayMode("season")}
-                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === "season"
-                                        ? "bg-amber-500/20 text-amber-400"
-                                        : "text-slate-500 hover:text-slate-300"
-                                    }`}
-                            >
-                                {currentSeason.name}
-                            </button>
-                            <button
-                                onClick={() => setDisplayMode("allTime")}
-                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === "allTime"
-                                        ? "bg-emerald-500/20 text-emerald-400"
-                                        : "text-slate-500 hover:text-slate-300"
-                                    }`}
-                            >
-                                All Time
-                            </button>
-                        </div>
-                    )}
+                    <div className="flex gap-1 mb-6 bg-slate-800/50 rounded-lg p-1 w-fit">
+                        <button
+                            onClick={() => setDisplayMode("allTime")}
+                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === "allTime"
+                                ? "bg-emerald-500/20 text-emerald-400"
+                                : "text-slate-500 hover:text-slate-300"
+                                }`}
+                        >
+                            All Time
+                        </button>
+                        <button
+                            onClick={() => currentSeason && setDisplayMode("season")}
+                            disabled={!currentSeason}
+                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === "season"
+                                ? "bg-amber-500/20 text-amber-400"
+                                : "text-slate-500 hover:text-slate-300"
+                                } ${!currentSeason ? "opacity-40 cursor-not-allowed" : ""}`}
+                        >
+                            Season
+                        </button>
+                    </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
                         <div>
@@ -242,9 +273,14 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                             </div>
                         </div>
                         <div>
-                            <div className="text-sm text-slate-500 font-bold uppercase tracking-wider mb-1">{metrics.modeLabel} Return</div>
+                            <div className="text-sm text-slate-500 font-bold uppercase tracking-wider mb-1">Return</div>
                             <div className={`text-4xl font-bold tracking-tight ${metrics.plAbs >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                                 {metrics.plAbs >= 0 ? "+" : ""}{formatCurrency(metrics.plAbs)}
+                            </div>
+                            <div className="text-xs text-slate-500 mt-1">
+                                {displayMode === "season"
+                                    ? `Season start: ${formatCurrency(metrics.baseline)}`
+                                    : `Initial: ${formatCurrency(metrics.baseline)}`}
                             </div>
                             <div className={`text-sm font-bold mt-1 ${metrics.plAbs >= 0 ? "text-emerald-500" : "text-red-500"}`}>
                                 {metrics.plAbs >= 0 ? "▲" : "▼"} {formatPercent(Math.abs(metrics.plPct))}
@@ -253,7 +289,7 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                         <div className="md:text-right">
                             <div className="text-sm text-slate-500 font-bold uppercase tracking-wider mb-1">Cash Ratio</div>
                             <div className="text-4xl font-bold text-white tracking-tight">
-                                {formatPercent((totalGroupCash / metrics.currentValue) * 100)}
+                                {formatPercent(cashRatio)}
                             </div>
                             <div className="text-sm text-slate-500 mt-1">
                                 {formatCurrency(totalGroupCash)} available
@@ -264,12 +300,11 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                     {/* Chart */}
                     <div className="h-64 w-full relative -mx-2">
                         <PerformanceChart
-                            portfolioHistory={group.portfolioHistory}
-                            currentValue={metrics.currentValue}
-                            initialCapital={metrics.baseline}
-                            showControls={true}
-                            currentSeason={currentSeason}
-                            showModeToggle={false}
+                            points={groupPoints}
+                            baseline={metrics.baseline}
+                            mode={displayMode}
+                            startTime={displayMode === "season" && currentSeason ? new Date(currentSeason.startTime).getTime() : undefined}
+                            showControls
                         />
                     </div>
                 </div>
@@ -376,4 +411,3 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
         </div>
     );
 }
-

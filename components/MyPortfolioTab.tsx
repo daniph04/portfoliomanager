@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { GroupState, Holding, PortfolioSnapshot, Season } from "@/lib/types";
+import { GroupState, Holding, PerformancePoint, Season } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
 import { formatCurrency, formatPercent, getMemberColor, getHoldingPnl, getHoldingPnlPercent, getTotalCostBasis, getMemberHoldings, getTotalPortfolioValue } from "@/lib/utils";
 import { getMetricsForMode, MetricsMode } from "@/lib/portfolioMath";
@@ -43,6 +43,35 @@ export default function MyPortfolioTab({
         return group.seasons.find(s => s.id === group.currentSeasonId) || null;
     }, [group.currentSeasonId, group.seasons]);
 
+    // Must calculate metrics before early return - use fallback values if no member
+    const metrics = currentMember ? getMetricsForMode(
+        currentMember,
+        group.holdings,
+        currentSeason,
+        displayMode,
+        group.portfolioHistory
+    ) : { currentValue: 0, baseline: 0, plAbs: 0, plPct: 0, modeLabel: "All Time", mode: "allTime" as const, portfolioValue: 0, investedValue: 0, cashBalance: 0 };
+
+    // memberHistory must be before early return
+    const memberHistory: PerformancePoint[] = useMemo(() => {
+        const raw = group.portfolioHistory.filter(p => (p.entityId || p.memberId) === currentProfileId);
+        const mapped = raw.map(p => ({
+            timestamp: new Date(p.timestamp).getTime(),
+            value: p.totalValue,
+            scope: p.scope === "group" ? "group" as const : "user" as const,
+            entityId: p.entityId || p.memberId,
+        }));
+        if (mapped.length === 0) {
+            return [{
+                timestamp: Date.now(),
+                value: metrics.currentValue,
+                scope: "user" as const,
+                entityId: currentProfileId,
+            }];
+        }
+        return mapped;
+    }, [group.portfolioHistory, currentProfileId, metrics.currentValue]);
+
     if (!currentMember) {
         return (
             <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
@@ -51,9 +80,6 @@ export default function MyPortfolioTab({
             </div>
         );
     }
-
-    // Use unified metrics for P&L calculations
-    const metrics = getMetricsForMode(currentMember, group.holdings, currentSeason, displayMode);
 
     // For chart and donut
     const totalHoldingsValue = getTotalPortfolioValue(myHoldings);
@@ -82,9 +108,6 @@ export default function MyPortfolioTab({
 
     // Sort by value desc
     chartData.sort((a, b) => b.value - a.value);
-
-    // Filter history for this member
-    const memberHistory = group.portfolioHistory.filter(p => p.memberId === currentProfileId);
 
     // Handlers
     const handleAddHolding = () => {
@@ -156,38 +179,42 @@ export default function MyPortfolioTab({
                     </div>
 
                     {/* Mode Toggle */}
-                    {currentSeason && (
-                        <div className="flex gap-1 mb-4 bg-slate-800/50 rounded-lg p-1 w-fit">
-                            <button
-                                onClick={() => setDisplayMode("season")}
-                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === "season"
-                                    ? "bg-amber-500/20 text-amber-400"
-                                    : "text-slate-500 hover:text-slate-300"
-                                    }`}
-                            >
-                                {currentSeason.name}
-                            </button>
-                            <button
-                                onClick={() => setDisplayMode("allTime")}
-                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === "allTime"
-                                    ? "bg-emerald-500/20 text-emerald-400"
-                                    : "text-slate-500 hover:text-slate-300"
-                                    }`}
-                            >
-                                All Time
-                            </button>
-                        </div>
-                    )}
+                    <div className="flex gap-1 mb-4 bg-slate-800/50 rounded-lg p-1 w-fit">
+                        <button
+                            onClick={() => setDisplayMode("allTime")}
+                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === "allTime"
+                                ? "bg-emerald-500/20 text-emerald-400"
+                                : "text-slate-500 hover:text-slate-300"
+                                }`}
+                        >
+                            All Time
+                        </button>
+                        <button
+                            onClick={() => currentSeason && setDisplayMode("season")}
+                            disabled={!currentSeason}
+                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${displayMode === "season"
+                                ? "bg-amber-500/20 text-amber-400"
+                                : "text-slate-500 hover:text-slate-300"
+                                } ${!currentSeason ? "opacity-40 cursor-not-allowed" : ""}`}
+                        >
+                            Season
+                        </button>
+                    </div>
 
-                    <div className="grid grid-cols-2 gap-8">
+                    <div className="grid grid-cols-2 gap-6">
                         <div>
                             <div className="text-sm text-slate-400 font-medium mb-1">Portfolio Value</div>
                             <div className="text-3xl font-bold text-white tracking-tight">
                                 {formatCurrency(metrics.currentValue)}
                             </div>
+                            <div className="text-xs text-slate-500 mt-1">
+                                {displayMode === "season"
+                                    ? `Season start: ${formatCurrency(metrics.baseline)} · Season: ${formatCurrency(metrics.plAbs)} (${formatPercent(metrics.plPct)})`
+                                    : `Initial: ${formatCurrency(metrics.baseline)} · All Time: ${formatCurrency(metrics.plAbs)} (${formatPercent(metrics.plPct)})`}
+                            </div>
                         </div>
                         <div className="text-right">
-                            <div className="text-sm text-slate-400 font-medium mb-1">{metrics.modeLabel} Return</div>
+                            <div className="text-sm text-slate-400 font-medium mb-1">Total Return</div>
                             <div className={`text-3xl font-bold tracking-tight ${metrics.plAbs >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                                 {metrics.plAbs >= 0 ? "+" : ""}{formatCurrency(metrics.plAbs)}
                             </div>
@@ -201,15 +228,11 @@ export default function MyPortfolioTab({
                 {/* Chart Area - bigger and without overlay covering controls */}
                 <div className="px-4 pb-6">
                     <PerformanceChart
-                        portfolioHistory={memberHistory}
-                        currentValue={metrics.currentValue}
-                        initialCapital={metrics.baseline}
-                        memberId={currentProfileId}
-                        showControls={true}
-                        showHeader={false}
-                        currentSeason={currentSeason}
-                        seasonInitialValue={currentSeason ? currentSeason.memberSnapshots[currentProfileId] : undefined}
-                        showModeToggle={false}
+                        points={memberHistory}
+                        baseline={metrics.baseline}
+                        mode={displayMode}
+                        startTime={displayMode === "season" && currentSeason ? new Date(currentSeason.startTime).getTime() : undefined}
+                        showControls
                         className="h-64"
                     />
                 </div>

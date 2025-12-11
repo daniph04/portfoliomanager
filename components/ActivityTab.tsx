@@ -64,6 +64,14 @@ const WithdrawIcon = () => (
     </div>
 );
 
+const SeasonIcon = () => (
+    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+        <svg className="w-5 h-5 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8l2.09 4.26L19 13l-3.4 3.3L16.18 21 12 18.9 7.82 21 9 16.3 5 13l4.91-.74L12 8z" />
+        </svg>
+    </div>
+);
+
 const getEventIcon = (type: string) => {
     switch (type) {
         case "BUY": return <BuyIcon />;
@@ -72,6 +80,8 @@ const getEventIcon = (type: string) => {
         case "JOIN": return <JoinIcon />;
         case "DEPOSIT": return <DepositIcon />;
         case "WITHDRAW": return <WithdrawIcon />;
+        case "SEASON_STARTED": return <SeasonIcon />;
+        case "GROUP_CREATED": return <JoinIcon />;
         case "NOTE": return <NoteIcon />;
         default: return <NoteIcon />;
     }

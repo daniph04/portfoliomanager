@@ -15,7 +15,6 @@ import {
     Season
 } from "./types";
 import { generateId, generateRandomHue } from "./utils";
-import { computeInvestorMetrics } from "./portfolioMath";
 
 const STORAGE_KEY = "portfolio_league_app_v3";
 const SESSION_KEY = "portfolio_league_session";
@@ -96,6 +95,88 @@ export function usePersistentGroupData(): {
     const [session, setSession] = useState<UserSession | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
+    const MAX_SNAPSHOTS_PER_ENTITY = 200;
+
+    const computeMemberTotals = useCallback((state: GroupState, memberId: string) => {
+        const member = state.members.find(m => m.id === memberId);
+        if (!member) {
+            return { totalValue: 0, costBasis: 0 };
+        }
+        const memberHoldings = state.holdings.filter(h => h.memberId === memberId);
+        const holdingsValue = memberHoldings.reduce((sum, h) => sum + (h.quantity * h.currentPrice), 0);
+        const holdingsCost = memberHoldings.reduce((sum, h) => sum + (h.quantity * h.avgBuyPrice), 0);
+        return {
+            totalValue: member.cashBalance + holdingsValue,
+            costBasis: member.cashBalance + holdingsCost,
+        };
+    }, []);
+
+    const computeGroupTotals = useCallback((state: GroupState) => {
+        return state.members.reduce((acc, member) => {
+            const totals = computeMemberTotals(state, member.id);
+            return {
+                totalValue: acc.totalValue + totals.totalValue,
+                costBasis: acc.costBasis + totals.costBasis,
+            };
+        }, { totalValue: 0, costBasis: 0 });
+    }, [computeMemberTotals]);
+
+    const trimSnapshots = useCallback((snapshots: GroupState["portfolioHistory"]) => {
+        const grouped = new Map<string, typeof snapshots>();
+
+        snapshots.forEach(s => {
+            const key = s.entityId || s.memberId;
+            if (!grouped.has(key)) grouped.set(key, []);
+            grouped.get(key)!.push(s);
+        });
+
+        const trimmed: typeof snapshots = [];
+        grouped.forEach(list => {
+            const ordered = list.sort((a, b) =>
+                new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+            );
+            const keep = ordered.slice(-MAX_SNAPSHOTS_PER_ENTITY);
+            trimmed.push(...keep);
+        });
+
+        return trimmed;
+    }, []);
+
+    const appendSnapshotsToGroup = useCallback((
+        state: GroupState,
+        memberIds: string[],
+        timestampIso: string
+    ): GroupState["portfolioHistory"] => {
+        let history = [...(state.portfolioHistory || [])];
+
+        memberIds.forEach(memberId => {
+            const totals = computeMemberTotals(state, memberId);
+            history.push({
+                id: generateId(),
+                timestamp: timestampIso,
+                memberId,
+                totalValue: totals.totalValue,
+                costBasis: totals.costBasis,
+                scope: "user",
+                entityId: memberId,
+            });
+        });
+
+        // Group snapshot
+        const groupTotals = computeGroupTotals(state);
+        history.push({
+            id: generateId(),
+            timestamp: timestampIso,
+            memberId: "group",
+            totalValue: groupTotals.totalValue,
+            costBasis: groupTotals.costBasis,
+            scope: "group",
+            entityId: state.id,
+        });
+
+        return trimSnapshots(history);
+    }, [computeGroupTotals, computeMemberTotals, trimSnapshots]);
+
     // Get current group from session
     const group: GroupState = session?.groupId
         ? appState.groups.find(g => g.id === session.groupId) || createEmptyGroup("Unknown")
@@ -170,7 +251,8 @@ export function usePersistentGroupData(): {
 
                                     return {
                                         ...m,
-                                        initialCapital: computedInitialCapital > 0 ? computedInitialCapital : m.cashBalance
+                                        initialCapital: computedInitialCapital > 0 ? computedInitialCapital : m.cashBalance,
+                                        initialValue: computedInitialCapital > 0 ? computedInitialCapital : m.cashBalance,
                                     };
                                 }
                                 return m;
@@ -247,7 +329,18 @@ export function usePersistentGroupData(): {
 
     // Create a new group
     const createGroup = useCallback((name: string, password: string): GroupState => {
-        const newGroup = createEmptyGroup(name);
+        const now = new Date().toISOString();
+        const newGroup: GroupState = {
+            ...createEmptyGroup(name),
+            activity: [{
+                id: generateId(),
+                timestamp: now,
+                memberId: null,
+                type: "GROUP_CREATED",
+                title: `${name} created`,
+                description: "Group initialized",
+            }],
+        };
         // Store password hash (simple for now, just base64)
         const passwordKey = `group_password_${newGroup.id}`;
         if (typeof window !== "undefined") {
@@ -304,12 +397,15 @@ export function usePersistentGroupData(): {
 
     // Create profile with initial cash and holdings
     const createProfile = useCallback((groupId: string, input: CreateProfileInput): Member => {
+        const initialHoldingsCost = input.initialHoldings.reduce((sum, h) => sum + (h.quantity * h.avgBuyPrice), 0);
+        const initialValue = input.initialCash + initialHoldingsCost;
         const newMember: Member = {
             id: generateId(),
             name: input.name.trim(),
             colorHue: generateRandomHue(),
             cashBalance: input.initialCash,
-            initialCapital: input.initialCash, // Set initial capital
+            initialCapital: initialValue, // Set initial capital to true starting value
+            initialValue,
             totalRealizedPnl: 0,
             createdAt: new Date().toISOString(),
         };
@@ -355,52 +451,37 @@ export function usePersistentGroupData(): {
         });
 
         updateGroup(groupId, prev => {
-            const updatedGroup = {
+            let updatedGroup: GroupState = {
                 ...prev,
                 members: [...prev.members, newMember],
                 holdings: [...prev.holdings, ...newHoldings],
                 activity: [...activities, ...prev.activity],
             };
 
-            // Create initial snapshot for the new member
-            // IMPORTANT: Use initialCapital as baseline for 0% starting point
-            // This ensures the chart shows gains/losses relative to the starting capital
-            const holdingsValue = newHoldings.reduce((sum, h) => sum + (h.quantity * h.currentPrice), 0);
-            const totalValue = input.initialCash + holdingsValue;
-            const costBasis = newHoldings.reduce((sum, h) => sum + (h.quantity * h.avgBuyPrice), 0);
-
-            // First snapshot: represents the INITIAL state at starting capital
-            // This creates the zero baseline for percentage calculations
-            const baselineSnapshot: PortfolioSnapshot = {
-                timestamp: now,
-                memberId: newMember.id,
-                totalValue: input.initialCash, // Start at initial capital
-                costBasis: input.initialCash,  // Cost basis = initial capital (0% gain)
-            };
-
-            // If user added holdings with current prices different from avg prices,
-            // create a second snapshot showing the current state
-            const snapshots = [baselineSnapshot];
-
-            if (newHoldings.length > 0) {
-                // Add a snapshot 1 second later showing current positions
-                const currentSnapshot: PortfolioSnapshot = {
-                    timestamp: new Date(new Date(now).getTime() + 1000).toISOString(),
-                    memberId: newMember.id,
-                    totalValue,
-                    costBasis: input.initialCash, // Keep initial capital as cost basis for % calculation
-                };
-                snapshots.push(currentSnapshot);
+            if (updatedGroup.currentSeasonId && updatedGroup.seasons.length > 0) {
+                const idx = updatedGroup.seasons.findIndex(s => s.id === updatedGroup.currentSeasonId);
+                if (idx >= 0) {
+                    const season = updatedGroup.seasons[idx];
+                    const totals = computeMemberTotals(updatedGroup, newMember.id);
+                    const updatedSeason: Season = {
+                        ...season,
+                        memberSnapshots: {
+                            ...season.memberSnapshots,
+                            [newMember.id]: totals.totalValue,
+                        },
+                    };
+                    const seasonsCopy = [...updatedGroup.seasons];
+                    seasonsCopy[idx] = updatedSeason;
+                    updatedGroup = { ...updatedGroup, seasons: seasonsCopy };
+                }
             }
 
-            return {
-                ...updatedGroup,
-                portfolioHistory: [...(prev.portfolioHistory || []), ...snapshots],
-            };
+            const portfolioHistory = appendSnapshotsToGroup(updatedGroup, [newMember.id], now);
+            return { ...updatedGroup, portfolioHistory };
         });
 
         return newMember;
-    }, [updateGroup]);
+    }, [updateGroup, appendSnapshotsToGroup, computeMemberTotals]);
 
     // Simple add member (legacy support)
     const addMember = useCallback((name: string): Member => {
@@ -414,6 +495,7 @@ export function usePersistentGroupData(): {
             colorHue: generateRandomHue(),
             cashBalance: 0,
             initialCapital: 0, // Default for empty
+            initialValue: 0,
             totalRealizedPnl: 0,
             createdAt: new Date().toISOString(),
         };
@@ -472,47 +554,59 @@ export function usePersistentGroupData(): {
     const depositCash = useCallback((memberId: string, amount: number, note?: string) => {
         if (!session?.groupId) return;
 
-        updateGroup(session.groupId, prev => ({
-            ...prev,
-            members: prev.members.map(m =>
-                m.id === memberId
-                    ? { ...m, cashBalance: m.cashBalance + amount }
-                    : m
-            ),
-            activity: [{
-                id: generateId(),
-                timestamp: new Date().toISOString(),
-                memberId,
-                type: "DEPOSIT",
-                title: `Deposited $${amount.toLocaleString()}`,
-                description: note || "Added cash to portfolio.",
-                amountChangeUsd: amount,
-            }, ...prev.activity],
-        }));
-    }, [session, updateGroup]);
+        const now = new Date().toISOString();
+
+        updateGroup(session.groupId, prev => {
+            const updatedGroup: GroupState = {
+                ...prev,
+                members: prev.members.map(m =>
+                    m.id === memberId
+                        ? { ...m, cashBalance: m.cashBalance + amount }
+                        : m
+                ),
+                activity: [{
+                    id: generateId(),
+                    timestamp: now,
+                    memberId,
+                    type: "DEPOSIT",
+                    title: `Deposited $${amount.toLocaleString()}`,
+                    description: note || "Added cash to portfolio.",
+                    amountChangeUsd: amount,
+                }, ...prev.activity],
+            };
+            const portfolioHistory = appendSnapshotsToGroup(updatedGroup, [memberId], now);
+            return { ...updatedGroup, portfolioHistory };
+        });
+    }, [session, updateGroup, appendSnapshotsToGroup]);
 
     // Withdraw cash
     const withdrawCash = useCallback((memberId: string, amount: number, note?: string) => {
         if (!session?.groupId) return;
 
-        updateGroup(session.groupId, prev => ({
-            ...prev,
-            members: prev.members.map(m =>
-                m.id === memberId
-                    ? { ...m, cashBalance: Math.max(0, m.cashBalance - amount) }
-                    : m
-            ),
-            activity: [{
-                id: generateId(),
-                timestamp: new Date().toISOString(),
-                memberId,
-                type: "WITHDRAW",
-                title: `Withdrew $${amount.toLocaleString()}`,
-                description: note || "Removed cash from portfolio.",
-                amountChangeUsd: -amount,
-            }, ...prev.activity],
-        }));
-    }, [session, updateGroup]);
+        const now = new Date().toISOString();
+
+        updateGroup(session.groupId, prev => {
+            const updatedGroup: GroupState = {
+                ...prev,
+                members: prev.members.map(m =>
+                    m.id === memberId
+                        ? { ...m, cashBalance: Math.max(0, m.cashBalance - amount) }
+                        : m
+                ),
+                activity: [{
+                    id: generateId(),
+                    timestamp: now,
+                    memberId,
+                    type: "WITHDRAW",
+                    title: `Withdrew $${amount.toLocaleString()}`,
+                    description: note || "Removed cash from portfolio.",
+                    amountChangeUsd: -amount,
+                }, ...prev.activity],
+            };
+            const portfolioHistory = appendSnapshotsToGroup(updatedGroup, [memberId], now);
+            return { ...updatedGroup, portfolioHistory };
+        });
+    }, [session, updateGroup, appendSnapshotsToGroup]);
 
     // Add holding (deducts from cash) - returns null if insufficient funds
     const addHolding = useCallback((memberId: string, input: NewHoldingInput): Holding | null => {
@@ -544,46 +638,55 @@ export function usePersistentGroupData(): {
             cryptoId: input.cryptoId,
         };
 
-        updateGroup(session.groupId, prev => ({
-            ...prev,
-            // Deduct cash from member
-            members: prev.members.map(m =>
-                m.id === memberId
-                    ? { ...m, cashBalance: Math.max(0, m.cashBalance - totalCost) }
-                    : m
-            ),
-            holdings: [...prev.holdings, newHolding],
-            activity: [{
-                id: generateId(),
-                timestamp: new Date().toISOString(),
-                memberId,
-                type: "BUY",
-                symbol: newHolding.symbol,
-                title: `Bought ${newHolding.symbol}`,
-                description: `Bought ${input.quantity} at $${input.avgBuyPrice.toFixed(2)} (total: $${totalCost.toLocaleString()}).`,
-                amountChangeUsd: -totalCost,
-            }, ...prev.activity],
-        }));
+        const now = new Date().toISOString();
+
+        updateGroup(session.groupId, prev => {
+            const updatedGroup: GroupState = {
+                ...prev,
+                // Deduct cash from member
+                members: prev.members.map(m =>
+                    m.id === memberId
+                        ? { ...m, cashBalance: Math.max(0, m.cashBalance - totalCost) }
+                        : m
+                ),
+                holdings: [...prev.holdings, newHolding],
+                activity: [{
+                    id: generateId(),
+                    timestamp: now,
+                    memberId,
+                    type: "BUY",
+                    symbol: newHolding.symbol,
+                    title: `Bought ${newHolding.symbol}`,
+                    description: `Bought ${input.quantity} at $${input.avgBuyPrice.toFixed(2)} (total: $${totalCost.toLocaleString()}).`,
+                    amountChangeUsd: -totalCost,
+                }, ...prev.activity],
+            };
+
+            const portfolioHistory = appendSnapshotsToGroup(updatedGroup, [memberId], now);
+            return { ...updatedGroup, portfolioHistory };
+        });
 
         return newHolding;
-    }, [session, updateGroup, appState.groups]);
+    }, [session, updateGroup, appState.groups, appendSnapshotsToGroup]);
 
     // Update holding
     const updateHolding = useCallback((holdingId: string, partial: Partial<Holding>) => {
         if (!session?.groupId) return;
 
+        const now = new Date().toISOString();
+
         updateGroup(session.groupId, prev => {
             const existing = prev.holdings.find(h => h.id === holdingId);
             if (!existing) return prev;
 
-            return {
+            const updatedGroup: GroupState = {
                 ...prev,
                 holdings: prev.holdings.map(h =>
                     h.id === holdingId ? { ...h, ...partial } : h
                 ),
                 activity: [{
                     id: generateId(),
-                    timestamp: new Date().toISOString(),
+                    timestamp: now,
                     memberId: existing.memberId,
                     type: "UPDATE",
                     symbol: existing.symbol,
@@ -591,12 +694,17 @@ export function usePersistentGroupData(): {
                     description: "Modified holding details.",
                 }, ...prev.activity],
             };
+
+            const portfolioHistory = appendSnapshotsToGroup(updatedGroup, [existing.memberId], now);
+            return { ...updatedGroup, portfolioHistory };
         });
-    }, [session, updateGroup]);
+    }, [session, updateGroup, appendSnapshotsToGroup]);
 
     // Sell holding (adds cash + realized P/L)
     const sellHolding = useCallback((holdingId: string, options?: SellHoldingOptions) => {
         if (!session?.groupId) return;
+
+        const now = new Date().toISOString();
 
         updateGroup(session.groupId, prev => {
             const holding = prev.holdings.find(h => h.id === holdingId);
@@ -607,7 +715,7 @@ export function usePersistentGroupData(): {
             const costBasis = holding.quantity * holding.avgBuyPrice;
             const realizedPnl = totalValue - costBasis;
 
-            return {
+            const updatedGroup: GroupState = {
                 ...prev,
                 // Add cash + update realized P/L for member
                 members: prev.members.map(m =>
@@ -631,8 +739,10 @@ export function usePersistentGroupData(): {
                     amountChangeUsd: realizedPnl,
                 }, ...prev.activity],
             };
+            const portfolioHistory = appendSnapshotsToGroup(updatedGroup, [holding.memberId], now);
+            return { ...updatedGroup, portfolioHistory };
         });
-    }, [session, updateGroup]);
+    }, [session, updateGroup, appendSnapshotsToGroup]);
 
     // Add note activity
     const addNoteActivity = useCallback((params: { memberId?: string | null; title: string; description?: string }) => {
@@ -666,19 +776,25 @@ export function usePersistentGroupData(): {
         if (!session?.groupId) return;
 
         const now = new Date().toISOString();
+        const touchedMembers = new Set<string>();
 
         updateGroup(session.groupId, prev => {
             const updatedHoldings = prev.holdings.map(holding => {
                 const newPrice = priceMap[holding.symbol];
                 if (newPrice !== undefined && newPrice !== holding.currentPrice) {
+                    touchedMembers.add(holding.memberId);
                     return { ...holding, currentPrice: newPrice, lastPriceUpdate: now };
                 }
                 return holding;
             });
 
-            return { ...prev, holdings: updatedHoldings };
+            const updatedGroup: GroupState = { ...prev, holdings: updatedHoldings };
+            const portfolioHistory = touchedMembers.size > 0
+                ? appendSnapshotsToGroup(updatedGroup, Array.from(touchedMembers), now)
+                : updatedGroup.portfolioHistory;
+            return { ...updatedGroup, portfolioHistory };
         });
-    }, [session, updateGroup]);
+    }, [session, updateGroup, appendSnapshotsToGroup]);
 
     // Get portfolio history for a member
     const getPortfolioHistory = useCallback((memberId: string): PortfolioSnapshot[] => {
@@ -692,135 +808,24 @@ export function usePersistentGroupData(): {
     const recordPortfolioSnapshot = useCallback((memberId: string) => {
         if (!session?.groupId) return;
 
-        const currentGroup = appState.groups.find(g => g.id === session.groupId);
-        if (!currentGroup) return;
-
-        const member = currentGroup.members.find(m => m.id === memberId);
-        if (!member) return;
-
-        const memberHoldings = currentGroup.holdings.filter(h => h.memberId === memberId);
-        const holdingsValue = memberHoldings.reduce((sum, h) => sum + (h.quantity * h.currentPrice), 0);
-        const totalValue = member.cashBalance + holdingsValue;
-        const costBasis = memberHoldings.reduce((sum, h) => sum + (h.quantity * h.avgBuyPrice), 0);
-
         const now = new Date().toISOString();
-
         updateGroup(session.groupId, prev => {
-            const history = prev.portfolioHistory || [];
-            const memberHistory = history.filter(s => s.memberId === memberId);
-            const lastSnapshot = memberHistory[memberHistory.length - 1];
-
-            let newHistory = [...history];
-
-            const newSnapshot: PortfolioSnapshot = {
-                timestamp: now,
-                memberId,
-                totalValue,
-                costBasis,
-            };
-
-            // CHECK: Is there already a snapshot for TODAY?
-            // If so, update it instead of appending new one.
-            const isSameDay = (d1: Date, d2: Date) =>
-                d1.getFullYear() === d2.getFullYear() &&
-                d1.getMonth() === d2.getMonth() &&
-                d1.getDate() === d2.getDate();
-
-            if (lastSnapshot && isSameDay(new Date(lastSnapshot.timestamp), new Date(now))) {
-                // Update the last snapshot entry in the main array
-                newHistory = newHistory.map(s =>
-                    (s.memberId === memberId && s.timestamp === lastSnapshot.timestamp)
-                        ? newSnapshot
-                        : s
-                );
-            } else {
-                // Append new
-                newHistory.push(newSnapshot);
-            }
-
-            return {
-                ...prev,
-                portfolioHistory: newHistory,
-            };
+            const portfolioHistory = appendSnapshotsToGroup(prev, [memberId], now);
+            return { ...prev, portfolioHistory };
         });
-    }, [session, appState.groups, updateGroup]);
+    }, [session, updateGroup, appendSnapshotsToGroup]);
 
     // Record snapshots for ALL members in the group (for group chart)
     const recordAllMembersSnapshot = useCallback(() => {
         if (!session?.groupId) return;
 
-        const currentGroup = appState.groups.find(g => g.id === session.groupId);
-        if (!currentGroup || currentGroup.members.length === 0) return;
-
         const now = new Date().toISOString();
-        const newSnapshots: PortfolioSnapshot[] = [];
-
-        // Check if we should skip (less than 30 seconds since last group snapshot)
-        const history = currentGroup.portfolioHistory || [];
-        const lastGroupSnapshot = history.length > 0 ? history[history.length - 1] : null;
-
-        if (lastGroupSnapshot) {
-            const lastTime = new Date(lastGroupSnapshot.timestamp).getTime();
-            const nowTime = new Date(now).getTime();
-            // Skip if less than 30 seconds since last snapshot
-            if (nowTime - lastTime < 30 * 1000) return;
-        }
-
-        const isSameDay = (d1: Date, d2: Date) =>
-            d1.getFullYear() === d2.getFullYear() &&
-            d1.getMonth() === d2.getMonth() &&
-            d1.getDate() === d2.getDate();
-
         updateGroup(session.groupId, prev => {
-            const history = prev.portfolioHistory || [];
-            let newHistory = [...history];
-
-            // If last snapshot was today, replace it (remove old entries for today)
-            // Actually, for group snapshot, we add multiple entries (one per member).
-            // So we need to remove ALL entries for today if we are updating "today".
-
-            // Simplified logic: Check if the VERY LAST entry in history is from today.
-            // If so, we assume the entire "batch" of snapshots from today should be replaced?
-            // BETTER: Filter out any snapshots from today for these members, then append new ones.
-            // But modifying history blindly is risky. 
-
-            // Let's stick to the Plan: "If there is already a snapshot for the same day, update that snapshot".
-            // Since we store individual member snapshots, we can just iterate.
-
-            const newSnapshotsForUpdate: PortfolioSnapshot[] = [];
-
-            currentGroup.members.forEach(member => {
-                const memberHoldings = currentGroup.holdings.filter(h => h.memberId === member.id);
-                const holdingsValue = memberHoldings.reduce((sum, h) => sum + (h.quantity * h.currentPrice), 0);
-                const totalValue = member.cashBalance + holdingsValue;
-                const costBasis = memberHoldings.reduce((sum, h) => sum + (h.quantity * h.avgBuyPrice), 0);
-
-                // Find existing snapshot for this member from today
-                const existingIndex = newHistory.findIndex(s =>
-                    s.memberId === member.id &&
-                    isSameDay(new Date(s.timestamp), new Date(now))
-                );
-
-                const snapshot = {
-                    timestamp: now,
-                    memberId: member.id,
-                    totalValue,
-                    costBasis,
-                };
-
-                if (existingIndex >= 0) {
-                    newHistory[existingIndex] = snapshot;
-                } else {
-                    newHistory.push(snapshot);
-                }
-            });
-
-            return {
-                ...prev,
-                portfolioHistory: newHistory,
-            };
+            const memberIds = prev.members.map(m => m.id);
+            const portfolioHistory = appendSnapshotsToGroup(prev, memberIds, now);
+            return { ...prev, portfolioHistory };
         });
-    }, [session, appState.groups, updateGroup]);
+    }, [session, updateGroup, appendSnapshotsToGroup]);
 
     // ===== SEASON FUNCTIONS =====
 
@@ -868,8 +873,8 @@ export function usePersistentGroupData(): {
         // Calculate current value for each member
         const memberSnapshots: Record<string, number> = {};
         currentGroup.members.forEach(member => {
-            const metrics = computeInvestorMetrics(member, currentGroup.holdings);
-            memberSnapshots[member.id] = metrics.portfolioValue;
+            const totals = computeMemberTotals(currentGroup, member.id);
+            memberSnapshots[member.id] = totals.totalValue;
         });
 
         const newSeason: Season = {
@@ -897,8 +902,13 @@ export function usePersistentGroupData(): {
             }, ...prev.activity],
         }));
 
+        updateGroup(session.groupId, prev => {
+            const portfolioHistory = appendSnapshotsToGroup(prev, prev.members.map(m => m.id), now);
+            return { ...prev, portfolioHistory };
+        });
+
         return newSeason;
-    }, [session, appState.groups, isGroupLeader, updateGroup]);
+    }, [session, appState.groups, isGroupLeader, updateGroup, computeMemberTotals, appendSnapshotsToGroup]);
 
     // End the current season
     const endSeason = useCallback((): void => {

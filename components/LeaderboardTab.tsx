@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { GroupState, Holding, Season } from "@/lib/types";
-import { sortMembersByPerformance, formatCurrency, formatPercent, getMemberColor, getHoldingPnlPercent, getHoldingPnl, getTotalCostBasis, getTotalPortfolioValue } from "@/lib/utils";
-import { computeSeasonMetrics } from "@/lib/portfolioMath";
+import { formatCurrency, formatPercent, getMemberColor, getHoldingPnlPercent, getHoldingPnl, getTotalCostBasis, getTotalPortfolioValue } from "@/lib/utils";
+import { getMetricsForMode, MetricsMode } from "@/lib/portfolioMath";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 type RankingMode = "season" | "allTime";
+type Timeframe = "1W" | "1M" | "YTD" | "ALL";
 
 interface LeaderboardTabProps {
     group: GroupState;
@@ -24,28 +25,30 @@ export default function LeaderboardTab({
     onEndSeason,
 }: LeaderboardTabProps) {
     const [rankingMode, setRankingMode] = useState<RankingMode>("allTime");
+    const [chartTimeframe, setChartTimeframe] = useState<Timeframe>("1M");
 
-    // All-time rankings (using existing function)
-    const allTimeRankings = sortMembersByPerformance(group);
-
-    // Season rankings (if season active, sort by season performance)
-    const seasonRankings = currentSeason
-        ? group.members.map(m => {
-            const metrics = computeSeasonMetrics(m, group.holdings, currentSeason);
-            const memberHoldings = group.holdings.filter(h => h.memberId === m.id);
+    const rankings = useMemo(() => {
+        return group.members.map(member => {
+            const metrics = getMetricsForMode(
+                member,
+                group.holdings,
+                currentSeason || null,
+                rankingMode,
+                group.portfolioHistory
+            );
+            const memberHoldings = group.holdings.filter(h => h.memberId === member.id);
+            const costBasis = getTotalCostBasis(memberHoldings);
             return {
-                member: m,
-                totalValue: metrics.portfolioValue,
-                costBasis: metrics.totalCostBasis,
-                pnl: metrics.seasonPLAbs,
-                pnlPercent: metrics.seasonPLPct,
+                member,
+                totalValue: metrics.currentValue,
+                costBasis,
+                baseline: metrics.baseline,
+                pnl: metrics.plAbs,
+                pnlPercent: metrics.plPct,
                 holdingCount: memberHoldings.length,
             };
-        }).sort((a, b) => b.pnlPercent - a.pnlPercent)
-        : allTimeRankings;
-
-    // Use the appropriate rankings based on mode
-    const rankings = (rankingMode === "season" && currentSeason) ? seasonRankings : allTimeRankings;
+        }).sort((a, b) => b.pnlPercent - a.pnlPercent);
+    }, [group.members, group.holdings, group.portfolioHistory, currentSeason, rankingMode]);
 
     const hasAnyHoldings = group.holdings.length > 0;
 
@@ -62,98 +65,78 @@ export default function LeaderboardTab({
 
     // Group stats
     const totalGroupValue = rankings.reduce((sum, r) => sum + r.totalValue, 0);
-    const totalGroupCost = rankings.reduce((sum, r) => sum + r.costBasis, 0);
     const totalGroupPnl = rankings.reduce((sum, r) => sum + r.pnl, 0);
     const avgReturn = rankings.length > 0 ? rankings.reduce((sum, r) => sum + r.pnlPercent, 0) / rankings.length : 0;
 
-    // Generate race chart data from REAL portfolio history snapshots
-    const generateRaceData = () => {
+    // Generate race chart data from snapshots with timeframe + mode baselines
+    const raceData = useMemo(() => {
         if (rankings.length === 0) return [];
+        const now = Date.now();
+        const cutoff = (() => {
+            switch (chartTimeframe) {
+                case "1W": return now - 7 * 24 * 60 * 60 * 1000;
+                case "1M": return now - 30 * 24 * 60 * 60 * 1000;
+                case "YTD": return new Date(new Date().getFullYear(), 0, 1).getTime();
+                case "ALL":
+                default: return 0;
+            }
+        })();
 
-        // Get all portfolio snapshots for all members
-        const allSnapshots = group.portfolioHistory || [];
+        const memberSeries = rankings.map(entry => {
+            const snapshots = group.portfolioHistory
+                .filter(s => (s.entityId || s.memberId) === entry.member.id)
+                .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+                .map(s => ({ timestamp: new Date(s.timestamp).getTime(), value: s.totalValue }));
 
-        if (allSnapshots.length === 0) {
-            // No real history - show current state only with flat line from 0 to current
-            return [
-                { name: "Start", ...Object.fromEntries(rankings.map(r => [r.member.name, 0])) },
-                { name: "Today", ...Object.fromEntries(rankings.map(r => [r.member.name, r.pnlPercent])) }
-            ];
-        }
+            const filtered = snapshots.filter(p => p.timestamp >= cutoff);
+            const seasonBaseline = rankingMode === "season" && currentSeason
+                ? (currentSeason.memberSnapshots[entry.member.id] ??
+                    snapshots.find(s => s.timestamp >= new Date(currentSeason.startTime).getTime())?.value ??
+                    entry.baseline)
+                : entry.baseline;
 
-        // Group snapshots by timestamp (rounded to hour for clean chart)
-        const snapshotsByTime = new Map<string, Map<string, number>>();
+            const effectiveBaseline = rankingMode === "allTime" && filtered.length > 0
+                ? filtered[0].value
+                : seasonBaseline;
 
-        allSnapshots.forEach(s => {
-            const date = new Date(s.timestamp);
-            // Round to hour for cleaner grouping
-            date.setMinutes(0, 0, 0);
-            const timeKey = date.toISOString();
+            const series = (filtered.length > 0 ? filtered : snapshots.slice(-1)).map(p => ({
+                timestamp: p.timestamp,
+                pct: effectiveBaseline > 0 ? ((p.value - effectiveBaseline) / effectiveBaseline) * 100 : 0,
+            }));
 
-            if (!snapshotsByTime.has(timeKey)) {
-                snapshotsByTime.set(timeKey, new Map());
+            if (series.length === 1) {
+                series.push({ timestamp: series[0].timestamp + 1000, pct: series[0].pct });
             }
 
-            const member = group.members.find(m => m.id === s.memberId);
-            if (member) {
-                // Calculate return percentage at this point
-                const initialCapital = member.initialCapital || (member.cashBalance + getTotalCostBasis(group.holdings.filter(h => h.memberId === member.id)));
-                const returnPct = initialCapital > 0 ? ((s.totalValue - initialCapital) / initialCapital) * 100 : 0;
-                snapshotsByTime.get(timeKey)!.set(member.name, returnPct);
-            }
+            return { member: entry.member, series };
         });
 
-        // Sort by time and take max 12 points
-        const sortedTimes = Array.from(snapshotsByTime.keys()).sort();
-        const numPoints = Math.min(12, sortedTimes.length);
-        const step = Math.max(1, Math.floor(sortedTimes.length / numPoints));
-        const selectedTimes = sortedTimes.filter((_, idx) => idx % step === 0 || idx === sortedTimes.length - 1);
+        const timestamps = Array.from(new Set(memberSeries.flatMap(m => m.series.map(p => p.timestamp)))).sort((a, b) => a - b);
+        const lastSeen: Record<string, number> = {};
 
-        // Build chart data points
-        const points = selectedTimes.map((timeKey, idx) => {
-            const date = new Date(timeKey);
-            const label = idx === 0 ? "Start" : idx === selectedTimes.length - 1 ? "Today" :
-                date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-
-            const point: Record<string, number | string> = { name: label };
-            const snapshot = snapshotsByTime.get(timeKey)!;
-
-            // Fill in data for each member
-            rankings.forEach(r => {
-                const memberValue = snapshot.get(r.member.name);
-                // Use snapshot value if available, otherwise interpolate to 0 at start or current at end
-                if (memberValue !== undefined) {
-                    point[r.member.name] = memberValue;
-                } else if (idx === 0) {
-                    point[r.member.name] = 0;
-                } else {
-                    point[r.member.name] = r.pnlPercent;
+        const data = timestamps.map(ts => {
+            const row: Record<string, number | string> = {
+                name: new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+            };
+            memberSeries.forEach(ms => {
+                const hit = ms.series.find(p => p.timestamp === ts);
+                if (hit) {
+                    lastSeen[ms.member.id] = hit.pct;
                 }
+                row[ms.member.name] = lastSeen[ms.member.id] ?? 0;
             });
-
-            return point;
+            return row;
         });
 
-        // Ensure we have at least 2 points for a visible line
-        if (points.length === 0) {
+        if (data.length === 0) {
             return [
                 { name: "Start", ...Object.fromEntries(rankings.map(r => [r.member.name, 0])) },
                 { name: "Today", ...Object.fromEntries(rankings.map(r => [r.member.name, r.pnlPercent])) }
             ];
         }
 
-        if (points.length === 1) {
-            // Add today's point
-            points.push({
-                name: "Today",
-                ...Object.fromEntries(rankings.map(r => [r.member.name, r.pnlPercent]))
-            });
-        }
-
-        return points;
-    };
-
-    const raceData = generateRaceData();
+        return data;
+    }, [rankings, group.portfolioHistory, chartTimeframe, rankingMode, currentSeason]);
 
     // Empty state
     if (group.members.length === 0) {
@@ -187,28 +170,27 @@ export default function LeaderboardTab({
                     {/* Season Controls - visible to leader */}
                     <div className="flex items-center gap-3">
                         {/* Mode Toggle */}
-                        {currentSeason && (
-                            <div className="flex gap-1 bg-slate-800/50 rounded-lg p-1">
-                                <button
-                                    onClick={() => setRankingMode("season")}
-                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${rankingMode === "season"
-                                        ? "bg-amber-500/20 text-amber-400"
-                                        : "text-slate-500 hover:text-slate-300"
-                                        }`}
-                                >
-                                    {currentSeason.name}
-                                </button>
-                                <button
-                                    onClick={() => setRankingMode("allTime")}
-                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${rankingMode === "allTime"
-                                        ? "bg-emerald-500/20 text-emerald-400"
-                                        : "text-slate-500 hover:text-slate-300"
-                                        }`}
-                                >
-                                    All Time
-                                </button>
-                            </div>
-                        )}
+                        <div className="flex gap-1 bg-slate-800/50 rounded-lg p-1">
+                            <button
+                                onClick={() => setRankingMode("allTime")}
+                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${rankingMode === "allTime"
+                                    ? "bg-emerald-500/20 text-emerald-400"
+                                    : "text-slate-500 hover:text-slate-300"
+                                    }`}
+                            >
+                                All Time
+                            </button>
+                            <button
+                                onClick={() => currentSeason && setRankingMode("season")}
+                                disabled={!currentSeason}
+                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${rankingMode === "season"
+                                    ? "bg-amber-500/20 text-amber-400"
+                                    : "text-slate-500 hover:text-slate-300"
+                                    } ${!currentSeason ? "opacity-40 cursor-not-allowed" : ""}`}
+                            >
+                                Season
+                            </button>
+                        </div>
 
                         {/* Start/End Season Button - only for leader */}
                         {isLeader && !currentSeason && onStartSeason && (
@@ -254,10 +236,23 @@ export default function LeaderboardTab({
             {/* Race Chart */}
             {hasAnyHoldings && rankings.length > 0 && (
                 <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4 md:p-6">
-                    <h3 className="text-lg font-semibold text-slate-100 mb-4 flex items-center gap-2">
-                        <span>🏁</span> Performance Race
-                        <span className="text-xs font-normal text-slate-500 ml-2">· Leader in bold</span>
-                    </h3>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                            <span>🏁</span> Performance Race
+                            <span className="text-xs font-normal text-slate-500 ml-2">· Leader in bold</span>
+                        </h3>
+                        <div className="flex gap-1 bg-slate-800/60 rounded-lg p-1">
+                            {(["1W", "1M", "YTD", "ALL"] as Timeframe[]).map(tf => (
+                                <button
+                                    key={tf}
+                                    onClick={() => setChartTimeframe(tf)}
+                                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold ${chartTimeframe === tf ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"}`}
+                                >
+                                    {tf}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                     <div className="h-48 md:h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={raceData}>

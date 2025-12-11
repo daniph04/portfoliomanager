@@ -24,7 +24,8 @@ export interface Member {
     colorHue: number;           // 0-360 for HSL color generation
     cashBalance: number;        // Uninvested cash
     totalRealizedPnl: number;   // Cumulative realized P/L from all sales
-    initialCapital?: number;    // The starting bankroll (fixed when joining)
+    initialCapital?: number;    // The starting bankroll (fixed when joining) - legacy
+    initialValue?: number;      // Explicit all-time baseline (cash + cost basis at join)
     avatarInitials?: string;    // e.g. "DP"
     createdAt: string;          // ISO timestamp
 }
@@ -48,12 +49,21 @@ export interface ActivityEvent {
 
 // Portfolio value snapshot for historical chart
 export interface PortfolioSnapshot {
+    id?: string;                // Optional unique id for deduplication
     timestamp: string;          // ISO timestamp
     memberId: string;           // Which member this snapshot is for
     totalValue: number;         // Cash + Holdings value at this moment
     costBasis: number;          // Total cost basis at this moment
     scope?: "user" | "group";   // NEW: What this snapshot represents
     entityId?: string;          // NEW: userId or groupId
+}
+
+// Lightweight points for charts after filtering snapshots
+export interface PerformancePoint {
+    timestamp: number;          // ms
+    value: number;              // portfolio value
+    scope: "user" | "group";
+    entityId: string;
 }
 
 // Season for competitive periods

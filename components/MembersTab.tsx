@@ -1,17 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { GroupState, Holding, HoldingFormValues } from "@/lib/types";
+import { useMemo, useState } from "react";
+import { GroupState, Holding, HoldingFormValues, PerformancePoint, Season } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
 import {
     getMemberHoldings, getTotalPortfolioValue, getTotalPnl, getTotalPnlPercent,
     getHoldingPnl, getHoldingPnlPercent, getHoldingValue, getAssetClassBreakdown,
     formatCurrency, formatPercent, getMemberColor, getTotalCostBasis
 } from "@/lib/utils";
+import { getMetricsForMode, MetricsMode } from "@/lib/portfolioMath";
 import HoldingFormModal from "./HoldingFormModal";
 import SellConfirmModal from "./SellConfirmModal";
 import DonutChart from "./DonutChart";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import PerformanceChart from "./PerformanceChart";
 
 interface MembersTabProps {
     group: GroupState;
@@ -40,17 +41,26 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
     const [sellingHolding, setSellingHolding] = useState<Holding | null>(null);
     const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [displayMode, setDisplayMode] = useState<MetricsMode>("allTime");
 
     const selectedMember = selectedMemberId
         ? group.members.find((m) => m.id === selectedMemberId)
         : null;
 
+    const currentSeason: Season | null = useMemo(() => {
+        if (!group.currentSeasonId) return null;
+        return group.seasons.find(s => s.id === group.currentSeasonId) || null;
+    }, [group.currentSeasonId, group.seasons]);
+
     // Get member stats
     const memberHoldings = selectedMember ? getMemberHoldings(group.holdings, selectedMember.id) : [];
-    const totalValue = getTotalPortfolioValue(memberHoldings);
-    const costBasis = getTotalCostBasis(memberHoldings);
-    const totalPnl = getTotalPnl(memberHoldings);
-    const totalPnlPercent = getTotalPnlPercent(memberHoldings);
+    const metrics = selectedMember
+        ? getMetricsForMode(selectedMember, group.holdings, currentSeason, displayMode, group.portfolioHistory)
+        : null;
+    const investedValue = getTotalCostBasis(memberHoldings);
+    const currentValue = metrics?.currentValue ?? 0;
+    const plAbs = metrics?.plAbs ?? 0;
+    const plPct = metrics?.plPct ?? 0;
 
     // Asset allocation
     const assetBreakdown = getAssetClassBreakdown(memberHoldings);
@@ -62,45 +72,24 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
         }))
         .sort((a, b) => b.value - a.value);
 
-    // Performance chart data with smooth curve
-    const performanceData = (() => {
-        if (costBasis <= 0 || !selectedMember) return [];
-
-        const numPoints = 15;
-        const points = [];
-        const totalChange = totalValue - costBasis;
-
-        // Pseudo-random based on member for consistency
-        const seed = selectedMember.colorHue * 100 + costBasis;
-        const pseudoRandom = (i: number) => {
-            const x = Math.sin(seed + i * 12.9898) * 43758.5453;
-            return x - Math.floor(x);
-        };
-
-        for (let i = 0; i < numPoints; i++) {
-            const progress = i / (numPoints - 1);
-
-            // Eased progress for smooth curve
-            const eased = progress < 0.5
-                ? 2 * progress * progress
-                : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-
-            // Add realistic volatility
-            const noise = (pseudoRandom(i) - 0.5) * Math.abs(totalChange) * 0.25;
-            const volatility = Math.sin(progress * Math.PI) * 0.5;
-
-            let value = costBasis + (totalChange * eased) + noise * volatility;
-            if (i === 0) value = costBasis;
-            if (i === numPoints - 1) value = totalValue;
-
-            points.push({
-                name: i === 0 ? "Inicio" : i === numPoints - 1 ? "Hoy" : "",
-                value: Math.max(value, costBasis * 0.85),
-            });
+    const performancePoints: PerformancePoint[] = useMemo(() => {
+        if (!selectedMember) return [];
+        const raw = group.portfolioHistory.filter(p => (p.entityId || p.memberId) === selectedMember.id);
+        if (raw.length === 0 && metrics) {
+            return [{
+                timestamp: Date.now(),
+                value: metrics.currentValue,
+                scope: "user",
+                entityId: selectedMember.id,
+            }];
         }
-
-        return points;
-    })();
+        return raw.map(p => ({
+            timestamp: new Date(p.timestamp).getTime(),
+            value: p.totalValue,
+            scope: p.scope === "group" ? "group" : "user",
+            entityId: p.entityId || p.memberId,
+        }));
+    }, [group.portfolioHistory, selectedMember, metrics]);
 
     const refreshableSymbols = [...new Set(
         memberHoldings
@@ -352,70 +341,63 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
 
                             {/* Stats Grid */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {selectedMember.initialCapital && (
-                                    <div className="bg-slate-800/50 rounded-xl p-3">
-                                        <div className="text-xs text-slate-500 uppercase">Starting Capital</div>
-                                        <div className="text-lg font-bold text-slate-200">
-                                            {formatCurrency(selectedMember.initialCapital, 0)}
-                                        </div>
-                                    </div>
-                                )}
                                 <div className="bg-slate-800/50 rounded-xl p-3">
-                                    <div className="text-xs text-slate-500 uppercase">Invested</div>
-                                    <div className="text-lg font-bold text-slate-300">{formatCurrency(costBasis, 0)}</div>
+                                    <div className="text-xs text-slate-500 uppercase">Baseline</div>
+                                    <div className="text-lg font-bold text-slate-200">
+                                        {formatCurrency(metrics?.baseline || 0, 0)}
+                                    </div>
+                                    <div className="text-[11px] text-slate-500 mt-1">
+                                        {displayMode === "season" ? "Season start" : "All-time start"}
+                                    </div>
                                 </div>
                                 <div className="bg-slate-800/50 rounded-xl p-3">
                                     <div className="text-xs text-slate-500 uppercase">Current Value</div>
-                                    <div className="text-lg font-bold text-slate-100">{formatCurrency(totalValue, 0)}</div>
+                                    <div className="text-lg font-bold text-slate-100">{formatCurrency(currentValue, 0)}</div>
+                                </div>
+                                <div className="bg-slate-800/50 rounded-xl p-3">
+                                    <div className="text-xs text-slate-500 uppercase">Invested</div>
+                                    <div className="text-lg font-bold text-slate-300">{formatCurrency(investedValue, 0)}</div>
                                 </div>
                                 <div className="bg-slate-800/50 rounded-xl p-3">
                                     <div className="text-xs text-slate-500 uppercase">P/L</div>
-                                    <div className={`text-lg font-bold ${totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                        {totalPnl >= 0 ? "+" : ""}{formatCurrency(totalPnl, 0)} ({formatPercent(totalPnlPercent, 1)})
+                                    <div className={`text-lg font-bold ${plAbs >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                        {plAbs >= 0 ? "+" : ""}{formatCurrency(plAbs, 0)} ({formatPercent(plPct, 1)})
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Performance Chart */}
-                        {memberHoldings.length > 0 && performanceData.length > 0 && (
+                        {performancePoints.length > 0 && metrics && (
                             <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4">
-                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                    <span>📈</span> Performance
-                                </h3>
-                                <div className="h-36">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <LineChart data={performanceData}>
-                                            <XAxis
-                                                dataKey="name"
-                                                axisLine={false}
-                                                tickLine={false}
-                                                tick={{ fill: '#64748b', fontSize: 11 }}
-                                                interval="preserveStartEnd"
-                                            />
-                                            <YAxis
-                                                hide
-                                                domain={['dataMin - 20', 'dataMax + 20']}
-                                            />
-                                            <Tooltip
-                                                contentStyle={{
-                                                    backgroundColor: "#1e293b",
-                                                    border: "1px solid #334155",
-                                                    borderRadius: "8px",
-                                                }}
-                                                formatter={(value: number) => [formatCurrency(value), "Value"]}
-                                            />
-                                            <Line
-                                                type="monotone"
-                                                dataKey="value"
-                                                stroke={totalPnl >= 0 ? "#10b981" : "#ef4444"}
-                                                strokeWidth={2.5}
-                                                dot={false}
-                                                activeDot={{ r: 5, fill: totalPnl >= 0 ? "#10b981" : "#ef4444" }}
-                                            />
-                                        </LineChart>
-                                    </ResponsiveContainer>
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                        <span>📈</span> Performance
+                                    </h3>
+                                    <div className="flex gap-1 bg-slate-800/60 rounded-lg p-1 text-[11px]">
+                                        <button
+                                            onClick={() => setDisplayMode("allTime")}
+                                            className={`px-2 py-1 rounded ${displayMode === "allTime" ? "bg-slate-700 text-white" : "text-slate-400"}`}
+                                        >
+                                            All Time
+                                        </button>
+                                        <button
+                                            onClick={() => currentSeason && setDisplayMode("season")}
+                                            disabled={!currentSeason}
+                                            className={`px-2 py-1 rounded ${displayMode === "season" ? "bg-slate-700 text-amber-300" : "text-slate-400"} ${!currentSeason ? "opacity-40 cursor-not-allowed" : ""}`}
+                                        >
+                                            Season
+                                        </button>
+                                    </div>
                                 </div>
+                                <PerformanceChart
+                                    points={performancePoints}
+                                    baseline={metrics.baseline}
+                                    mode={displayMode}
+                                    startTime={displayMode === "season" && currentSeason ? new Date(currentSeason.startTime).getTime() : undefined}
+                                    showControls
+                                    height={200}
+                                />
                             </div>
                         )}
 
@@ -427,14 +409,14 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                                     <DonutChart
                                         data={chartData}
                                         centerLabel=""
-                                        centerValue={formatCurrency(totalValue, 0)}
+                                        centerValue={formatCurrency(currentValue, 0)}
                                         highlightedCategory={highlightedCategory}
                                         onHoverCategory={setHighlightedCategory}
                                         size={100}
                                     />
                                     <div className="flex-1 space-y-2">
                                         {chartData.map((item) => {
-                                            const percentage = totalValue > 0 ? (item.value / totalValue) * 100 : 0;
+                                            const percentage = currentValue > 0 ? (item.value / currentValue) * 100 : 0;
                                             return (
                                                 <div key={item.name} className="flex items-center justify-between">
                                                     <div className="flex items-center gap-2">

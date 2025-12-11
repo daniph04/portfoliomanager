@@ -1,4 +1,6 @@
-import { Holding, Member, GroupState, Season } from "./types";
+import { Holding, Member, GroupState, Season, PortfolioSnapshot } from "./types";
+
+type MetricsMode = "allTime" | "season";
 
 /**
  * Computes metrics for a single position (holding).
@@ -37,14 +39,6 @@ export function computeInvestorMetrics(member: Member, holdings: Holding[]) {
     // Portfolio Value = Cash + Invested
     const portfolioValue = member.cashBalance + investedValue;
 
-    // Use initialCapital if available (for ranking), otherwise use totalCostBasis as fallback for "return"
-    // Ideally initialCapital is set when creating the profile.
-    // If not set, we might default to cashBalance + costBasis (which assumes no P/L yet) or 0.
-    const startCapital = member.initialCapital ?? (member.cashBalance + totalCostBasis);
-
-    const totalReturnVal = portfolioValue - startCapital;
-    const totalReturnPct = startCapital === 0 ? 0 : (totalReturnVal / startCapital) * 100;
-
     // Daily PL / Unrealized PL is different. 
     // "Unrealized PL" is purely on holdings.
     const unrealizedPL = investedValue - totalCostBasis;
@@ -58,110 +52,75 @@ export function computeInvestorMetrics(member: Member, holdings: Holding[]) {
         totalCostBasis,
         unrealizedPL,
         unrealizedPLPct,
-        totalReturnVal,
-        totalReturnPct,
-        startCapital,
     };
 }
 
-/**
- * Computes metrics for the entire group.
- * @param group The group state.
- */
-export function computeGroupMetrics(group: GroupState) {
-    const memberMetrics = group.members.map(m => computeInvestorMetrics(m, group.holdings));
+const getEarliestSnapshotValue = (
+    snapshots: PortfolioSnapshot[],
+    memberId: string
+): number | null => {
+    const filtered = snapshots
+        .filter(s => (s.entityId || s.memberId) === memberId)
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-    const groupInitialCapital = memberMetrics.reduce((sum, m) => sum + m.startCapital, 0);
-    const groupCurrentValue = memberMetrics.reduce((sum, m) => sum + m.portfolioValue, 0);
+    if (filtered.length === 0) return null;
+    return filtered[0].totalValue;
+};
 
-    const groupPL = groupCurrentValue - groupInitialCapital;
-    const groupPLPct = groupInitialCapital === 0 ? 0 : (groupPL / groupInitialCapital) * 100;
+const computeCurrentValue = (member: Member, holdings: Holding[]): number => {
+    const memberHoldings = holdings.filter(h => h.memberId === member.id);
+    const investedValue = memberHoldings.reduce((sum, h) => sum + h.quantity * h.currentPrice, 0);
+    return member.cashBalance + investedValue;
+};
 
-    return {
-        groupInitialCapital,
-        groupCurrentValue,
-        groupPL,
-        groupPLPct,
-        memberMetrics
-    };
-}
-
-/**
- * Computes season-specific metrics for an investor.
- * Season P&L is calculated from the portfolio value at season start.
- * @param member The member (investor).
- * @param holdings The array of all holdings.
- * @param season The season to calculate metrics for.
- */
-export function computeSeasonMetrics(
+const computeBaselineAllTime = (
     member: Member,
     holdings: Holding[],
-    season: Season | null
-) {
-    const investorMetrics = computeInvestorMetrics(member, holdings);
+    history: PortfolioSnapshot[] = []
+): number => {
+    if (member.initialValue !== undefined) return member.initialValue;
+    if (member.initialCapital !== undefined) return member.initialCapital;
 
-    if (!season) {
-        // No active season - return zeroed season metrics
-        return {
-            ...investorMetrics,
-            seasonInitialValue: investorMetrics.portfolioValue,
-            seasonCurrentValue: investorMetrics.portfolioValue,
-            seasonPLAbs: 0,
-            seasonPLPct: 0,
-            hasSeasonData: false,
-        };
-    }
+    const earliestSnapshot = getEarliestSnapshotValue(history, member.id);
+    if (earliestSnapshot !== null) return earliestSnapshot;
 
-    // Get the member's portfolio value at season start
-    const seasonInitialValue = season.memberSnapshots[member.id] ?? investorMetrics.portfolioValue;
-    const seasonCurrentValue = investorMetrics.portfolioValue;
+    const costBasis = holdings
+        .filter(h => h.memberId === member.id)
+        .reduce((sum, h) => sum + h.quantity * h.avgBuyPrice, 0);
 
-    const seasonPLAbs = seasonCurrentValue - seasonInitialValue;
-    const seasonPLPct = seasonInitialValue === 0 ? 0 : (seasonPLAbs / seasonInitialValue) * 100;
+    return member.cashBalance + costBasis;
+};
 
-    return {
-        ...investorMetrics,
-        seasonInitialValue,
-        seasonCurrentValue,
-        seasonPLAbs,
-        seasonPLPct,
-        hasSeasonData: true,
-    };
-}
+const computeBaselineSeason = (
+    member: Member,
+    holdings: Holding[],
+    season: Season | null,
+    history: PortfolioSnapshot[] = []
+): number => {
+    if (!season) return computeCurrentValue(member, holdings);
 
-/**
- * Computes season metrics for the entire group.
- * @param group The group state.
- * @param season The active season (or null if none).
- */
-export function computeGroupSeasonMetrics(group: GroupState, season: Season | null) {
-    const memberSeasonMetrics = group.members.map(m =>
-        computeSeasonMetrics(m, group.holdings, season)
-    );
+    const snapshotValue = season.memberSnapshots[member.id];
+    if (snapshotValue !== undefined) return snapshotValue;
 
-    const groupSeasonInitial = memberSeasonMetrics.reduce((sum, m) => sum + m.seasonInitialValue, 0);
-    const groupSeasonCurrent = memberSeasonMetrics.reduce((sum, m) => sum + m.seasonCurrentValue, 0);
+    // Fallback: closest snapshot to season start
+    const startMs = new Date(season.startTime).getTime();
+    const memberHistory = history
+        .filter(s => (s.entityId || s.memberId) === member.id)
+        .map(s => ({ ...s, ts: new Date(s.timestamp).getTime() }))
+        .sort((a, b) => a.ts - b.ts);
 
-    const groupSeasonPLAbs = groupSeasonCurrent - groupSeasonInitial;
-    const groupSeasonPLPct = groupSeasonInitial === 0 ? 0 : (groupSeasonPLAbs / groupSeasonInitial) * 100;
+    const closest = memberHistory.reduce<{ diff: number; value: number } | null>((best, snap) => {
+        const diff = Math.abs(snap.ts - startMs);
+        if (!best || diff < best.diff) {
+            return { diff, value: snap.totalValue };
+        }
+        return best;
+    }, null);
 
-    // Also compute all-time metrics
-    const allTimeMetrics = computeGroupMetrics(group);
+    if (closest) return closest.value;
 
-    return {
-        ...allTimeMetrics,
-        memberSeasonMetrics,
-        groupSeasonInitial,
-        groupSeasonCurrent,
-        groupSeasonPLAbs,
-        groupSeasonPLPct,
-    };
-}
-
-/**
- * Display mode for P&L calculations
- */
-export type MetricsMode = "allTime" | "season";
+    return computeCurrentValue(member, holdings);
+};
 
 /**
  * Unified metrics interface for consistent UI display
@@ -173,7 +132,6 @@ export interface UnifiedMetrics {
     plPct: number;             // P&L percentage
     mode: MetricsMode;         // Which mode these metrics are for
     modeLabel: string;         // "All Time" or season name
-    // For charts
     portfolioValue: number;    // Same as currentValue
     investedValue: number;     // Current value in positions
     cashBalance: number;       // Cash
@@ -187,20 +145,23 @@ export function getMetricsForMode(
     member: Member,
     holdings: Holding[],
     season: Season | null,
-    mode: MetricsMode
+    mode: MetricsMode,
+    history: PortfolioSnapshot[] = []
 ): UnifiedMetrics {
     const investorMetrics = computeInvestorMetrics(member, holdings);
 
     const currentValue = investorMetrics.portfolioValue;
 
+    const seasonBaseline = computeBaselineSeason(member, holdings, season, history);
+    const allTimeBaseline = computeBaselineAllTime(member, holdings, history);
+
     if (mode === "season" && season) {
-        const seasonInitial = season.memberSnapshots[member.id] ?? currentValue;
-        const plAbs = currentValue - seasonInitial;
-        const plPct = seasonInitial > 0 ? (plAbs / seasonInitial) * 100 : 0;
+        const plAbs = currentValue - seasonBaseline;
+        const plPct = seasonBaseline > 0 ? (plAbs / seasonBaseline) * 100 : 0;
 
         return {
             currentValue,
-            baseline: seasonInitial,
+            baseline: seasonBaseline,
             plAbs,
             plPct,
             mode: "season",
@@ -212,7 +173,6 @@ export function getMetricsForMode(
     }
 
     // All Time mode
-    const allTimeBaseline = investorMetrics.startCapital;
     const plAbs = currentValue - allTimeBaseline;
     const plPct = allTimeBaseline > 0 ? (plAbs / allTimeBaseline) * 100 : 0;
 
@@ -235,10 +195,11 @@ export function getMetricsForMode(
 export function getGroupMetricsForMode(
     group: GroupState,
     season: Season | null,
-    mode: MetricsMode
+    mode: MetricsMode,
+    history: PortfolioSnapshot[] = []
 ): UnifiedMetrics & { memberCount: number; totalCash: number } {
     const memberMetrics = group.members.map(m =>
-        getMetricsForMode(m, group.holdings, season, mode)
+        getMetricsForMode(m, group.holdings, season, mode, history)
     );
 
     const currentValue = memberMetrics.reduce((sum, m) => sum + m.currentValue, 0);
@@ -263,3 +224,8 @@ export function getGroupMetricsForMode(
         totalCash,
     };
 }
+
+/**
+ * Convenience export for mode type to keep imports stable.
+ */
+export type { MetricsMode };
