@@ -29,44 +29,88 @@ export default function LeaderboardTab({ group }: LeaderboardTabProps) {
     const totalGroupPnl = rankings.reduce((sum, r) => sum + r.pnl, 0);
     const avgReturn = rankings.length > 0 ? rankings.reduce((sum, r) => sum + r.pnlPercent, 0) / rankings.length : 0;
 
-    // Generate race chart data with multiple points for curve effect
+    // Generate race chart data from REAL portfolio history snapshots
     const generateRaceData = () => {
         if (rankings.length === 0) return [];
 
-        const numPoints = 12;
-        const points = [];
+        // Get all portfolio snapshots for all members
+        const allSnapshots = group.portfolioHistory || [];
 
-        // Pseudo-random function for consistent curve
-        const pseudoRandom = (seed: number, i: number) => {
-            const x = Math.sin(seed + i * 12.9898) * 43758.5453;
-            return x - Math.floor(x);
-        };
+        if (allSnapshots.length === 0) {
+            // No real history - show current state only with flat line from 0 to current
+            return [
+                { name: "Start", ...Object.fromEntries(rankings.map(r => [r.member.name, 0])) },
+                { name: "Today", ...Object.fromEntries(rankings.map(r => [r.member.name, r.pnlPercent])) }
+            ];
+        }
 
-        for (let i = 0; i < numPoints; i++) {
-            const progress = i / (numPoints - 1);
-            const label = i === 0 ? "Start" : i === numPoints - 1 ? "Today" : ``;
+        // Group snapshots by timestamp (rounded to hour for clean chart)
+        const snapshotsByTime = new Map<string, Map<string, number>>();
+
+        allSnapshots.forEach(s => {
+            const date = new Date(s.timestamp);
+            // Round to hour for cleaner grouping
+            date.setMinutes(0, 0, 0);
+            const timeKey = date.toISOString();
+
+            if (!snapshotsByTime.has(timeKey)) {
+                snapshotsByTime.set(timeKey, new Map());
+            }
+
+            const member = group.members.find(m => m.id === s.memberId);
+            if (member) {
+                // Calculate return percentage at this point
+                const initialCapital = member.initialCapital || (member.cashBalance + getTotalCostBasis(group.holdings.filter(h => h.memberId === member.id)));
+                const returnPct = initialCapital > 0 ? ((s.totalValue - initialCapital) / initialCapital) * 100 : 0;
+                snapshotsByTime.get(timeKey)!.set(member.name, returnPct);
+            }
+        });
+
+        // Sort by time and take max 12 points
+        const sortedTimes = Array.from(snapshotsByTime.keys()).sort();
+        const numPoints = Math.min(12, sortedTimes.length);
+        const step = Math.max(1, Math.floor(sortedTimes.length / numPoints));
+        const selectedTimes = sortedTimes.filter((_, idx) => idx % step === 0 || idx === sortedTimes.length - 1);
+
+        // Build chart data points
+        const points = selectedTimes.map((timeKey, idx) => {
+            const date = new Date(timeKey);
+            const label = idx === 0 ? "Start" : idx === selectedTimes.length - 1 ? "Today" :
+                date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
             const point: Record<string, number | string> = { name: label };
+            const snapshot = snapshotsByTime.get(timeKey)!;
 
-            rankings.forEach((r, idx) => {
-                const targetPnl = r.pnlPercent;
-                // Eased progress for smooth curve
-                const eased = progress < 0.5
-                    ? 2 * progress * progress
-                    : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-
-                // Add some variation per investor
-                const noise = (pseudoRandom(idx * 100 + r.member.colorHue, i) - 0.5) * Math.abs(targetPnl) * 0.3;
-                const volatility = Math.sin(progress * Math.PI) * 0.5;
-
-                let value = targetPnl * eased + noise * volatility;
-                if (i === 0) value = 0;
-                if (i === numPoints - 1) value = targetPnl;
-
-                point[r.member.name] = value;
+            // Fill in data for each member
+            rankings.forEach(r => {
+                const memberValue = snapshot.get(r.member.name);
+                // Use snapshot value if available, otherwise interpolate to 0 at start or current at end
+                if (memberValue !== undefined) {
+                    point[r.member.name] = memberValue;
+                } else if (idx === 0) {
+                    point[r.member.name] = 0;
+                } else {
+                    point[r.member.name] = r.pnlPercent;
+                }
             });
 
-            points.push(point);
+            return point;
+        });
+
+        // Ensure we have at least 2 points for a visible line
+        if (points.length === 0) {
+            return [
+                { name: "Start", ...Object.fromEntries(rankings.map(r => [r.member.name, 0])) },
+                { name: "Today", ...Object.fromEntries(rankings.map(r => [r.member.name, r.pnlPercent])) }
+            ];
+        }
+
+        if (points.length === 1) {
+            // Add today's point
+            points.push({
+                name: "Today",
+                ...Object.fromEntries(rankings.map(r => [r.member.name, r.pnlPercent]))
+            });
         }
 
         return points;

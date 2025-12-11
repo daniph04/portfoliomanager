@@ -47,9 +47,27 @@ export default function MyPortfolioTab({
     const totalHoldingsValue = getTotalPortfolioValue(myHoldings);
     const investedAmount = getTotalCostBasis(myHoldings);
     const totalValue = totalHoldingsValue + cashBalance;
-    const initialCapital = currentMember.initialCapital || 0; // Use fixed initial capital
-    const totalPnl = totalValue - initialCapital;
-    const totalReturnPercent = initialCapital > 0 ? (totalPnl / initialCapital) * 100 : 0;
+
+    // Calculate initial capital - if not set, compute from current cash + cost basis of positions
+    // This handles legacy profiles that were created before initialCapital was tracked
+    const rawInitialCapital = currentMember.initialCapital;
+    const computedInitialCapital = rawInitialCapital && rawInitialCapital > 0
+        ? rawInitialCapital
+        : (cashBalance + investedAmount); // Fallback: assume starting capital was cash + what was invested
+
+    // REAL Total Return = currentValue - initialCapital
+    // This is the PROFIT/LOSS from the starting point
+    const unrealizedPL = totalHoldingsValue - investedAmount; // Pure position gains
+
+    // Use initialCapital for proper return calculation
+    // If initialCapital isn't set properly, show unrealizedPL as the P/L
+    const hasValidInitialCapital = rawInitialCapital && rawInitialCapital > 0;
+    const totalPnl = hasValidInitialCapital
+        ? (totalValue - rawInitialCapital)
+        : unrealizedPL; // Fallback to unrealized P/L
+    const totalReturnPercent = hasValidInitialCapital && rawInitialCapital > 0
+        ? (totalPnl / rawInitialCapital) * 100
+        : (investedAmount > 0 ? (unrealizedPL / investedAmount) * 100 : 0);
 
     // Day P/L (mock for now, or could be calculated if we had yesterday's close)
     // For now, we focus on Total P/L as the primary metric
@@ -137,7 +155,7 @@ export default function MyPortfolioTab({
                             <div>
                                 <h2 className="text-xl font-bold text-white tracking-tight">{currentMember.name}</h2>
                                 <div className="flex items-center gap-2 text-sm text-slate-400">
-                                    <span>Initial: {formatCurrency(initialCapital, 0)}</span>
+                                    <span>Initial: {formatCurrency(computedInitialCapital, 0)}</span>
                                 </div>
                             </div>
                         </div>
@@ -175,7 +193,7 @@ export default function MyPortfolioTab({
                     <PerformanceChart
                         portfolioHistory={memberHistory}
                         currentValue={totalValue}
-                        initialCapital={initialCapital}
+                        initialCapital={computedInitialCapital}
                         memberId={currentProfileId}
                         showControls={true}
                     />

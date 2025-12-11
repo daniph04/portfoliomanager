@@ -136,6 +136,31 @@ export function usePersistentGroupData(): {
                         parsed.groups.push(nanosectaGroup);
                     }
 
+                    // MIGRATION: Fix members with missing or zero initialCapital
+                    if (parsed.groups) {
+                        parsed.groups = parsed.groups.map((g: GroupState) => ({
+                            ...g,
+                            members: g.members.map((m: Member) => {
+                                // If initialCapital is missing or 0, compute it
+                                if (!m.initialCapital || m.initialCapital === 0) {
+                                    // Compute from cashBalance + cost basis of holdings
+                                    const memberHoldings = g.holdings.filter((h: Holding) => h.memberId === m.id);
+                                    const costBasis = memberHoldings.reduce((sum: number, h: Holding) =>
+                                        sum + (h.quantity * h.avgBuyPrice), 0);
+                                    const computedInitialCapital = m.cashBalance + costBasis;
+
+                                    console.log(`Migrating ${m.name}: computed initialCapital = $${computedInitialCapital}`);
+
+                                    return {
+                                        ...m,
+                                        initialCapital: computedInitialCapital > 0 ? computedInitialCapital : m.cashBalance
+                                    };
+                                }
+                                return m;
+                            })
+                        }));
+                    }
+
                     setAppState(parsed);
                 }
             } else {
