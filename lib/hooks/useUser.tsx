@@ -485,27 +485,45 @@ export function UserProvider({ children }: { children: ReactNode }) {
         await refreshData();
     };
 
-    // Delete holding (sell)
+    // Delete holding (sell) - FIXED: Now adds cash from sale
     const deleteHolding = async (id: string) => {
-        // Find the holding to get symbol for notification
-        const holdingToSell = holdings.find(h => h.id === id);
+        if (!authUser || !currentUser) return;
 
+        // Find the holding to get details for sale
+        const holdingToSell = holdings.find(h => h.id === id);
+        if (!holdingToSell) return;
+
+        // Calculate sale proceeds and P/L
+        const saleValue = holdingToSell.quantity * holdingToSell.currentPrice;
+        const costBasis = holdingToSell.quantity * holdingToSell.avgBuyPrice;
+        const realizedPL = saleValue - costBasis;
+
+        // 1. Delete the holding
         await supabase.from('user_holdings').delete().eq('id', id);
 
+        // 2. Update user's cash and realized P/L
+        const newCashBalance = currentUser.cashBalance + saleValue;
+        const newRealizedPnl = currentUser.totalRealizedPnl + realizedPL;
+
+        await supabase.from('user_profiles')
+            .update({
+                cash_balance: newCashBalance,
+                total_realized_pnl: newRealizedPnl
+            })
+            .eq('id', authUser.id);
+
         // Show local notification
-        if (shouldShowNotification('SELL') && holdingToSell) {
-            const totalValue = holdingToSell.quantity * holdingToSell.currentPrice;
-            const notification = generateActivityNotification('SELL', currentUser?.name || 'You', holdingToSell.symbol, totalValue);
+        if (shouldShowNotification('SELL')) {
+            const notification = generateActivityNotification('SELL', currentUser.name || 'You', holdingToSell.symbol, saleValue);
             showLocalNotification(notification);
         }
 
         // Send push to other group members
-        if (currentGroupId && currentUser && holdingToSell) {
-            const totalValue = holdingToSell.quantity * holdingToSell.currentPrice;
-            const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalValue);
+        if (currentGroupId) {
+            const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(saleValue);
             sendPushToGroup(
                 currentGroupId,
-                authUser?.id || '',
+                authUser.id,
                 `${currentUser.name} sold ${holdingToSell.symbol}`,
                 `Closed position worth ${formattedAmount}`,
                 'SELL',
@@ -514,15 +532,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
         }
 
         // Add activity event
-        if (currentGroupId && holdingToSell) {
-            const totalValue = holdingToSell.quantity * holdingToSell.currentPrice;
-            const costBasis = holdingToSell.quantity * holdingToSell.avgBuyPrice;
-            const realizedPL = totalValue - costBasis;
+        if (currentGroupId) {
             await addActivity(
                 currentGroupId,
                 'SELL',
                 `Sold ${holdingToSell.symbol}`,
-                `Sold ${holdingToSell.quantity} at $${holdingToSell.currentPrice.toFixed(2)}. P/L: ${realizedPL >= 0 ? '+' : ''}$${realizedPL.toFixed(2)}`,
+                `Sold ${holdingToSell.quantity} at $${holdingToSell.currentPrice.toFixed(2)}. Received $${saleValue.toLocaleString()}. P/L: ${realizedPL >= 0 ? '+' : ''}$${realizedPL.toFixed(2)}`,
                 holdingToSell.symbol,
                 realizedPL
             );
