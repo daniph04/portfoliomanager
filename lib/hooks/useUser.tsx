@@ -32,6 +32,7 @@ export interface UserProfile {
     email: string;
     cashBalance: number;
     totalRealizedPnl: number;
+    netDeposits: number;  // FINTECH: Track total deposits minus withdrawals
     createdAt: string;
 }
 
@@ -143,6 +144,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         email: p.email,
         cashBalance: Number(p.cash_balance) || 0,
         totalRealizedPnl: Number(p.total_realized_pnl) || 0,
+        netDeposits: Number(p.net_deposits) || 0,  // FINTECH: Map from DB
         createdAt: p.created_at,
     });
 
@@ -349,6 +351,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (updates.name) dbUpdates.name = updates.name;
         if (updates.cashBalance !== undefined) dbUpdates.cash_balance = updates.cashBalance;
         if (updates.totalRealizedPnl !== undefined) dbUpdates.total_realized_pnl = updates.totalRealizedPnl;
+        if (updates.netDeposits !== undefined) dbUpdates.net_deposits = updates.netDeposits;
 
         await supabase
             .from('user_profiles')
@@ -358,11 +361,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
         await refreshData();
     };
 
-    // Deposit cash
+    // Deposit cash - FINTECH FIX: Also update netDeposits
     const depositCash = async (amount: number) => {
         if (!authUser || !currentUser) return;
         const newBalance = currentUser.cashBalance + amount;
-        await updateUser({ cashBalance: newBalance });
+        const newNetDeposits = (currentUser.netDeposits || 0) + amount;
+        await updateUser({ cashBalance: newBalance, netDeposits: newNetDeposits });
 
         // Show local notification (only to self)
         if (shouldShowNotification('DEPOSIT')) {
@@ -383,11 +387,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    // Withdraw cash
+    // Withdraw cash - FINTECH FIX: Also update netDeposits
     const withdrawCash = async (amount: number) => {
         if (!authUser || !currentUser) return;
-        const newBalance = Math.max(0, currentUser.cashBalance - amount);
-        await updateUser({ cashBalance: newBalance });
+        if (amount > currentUser.cashBalance) {
+            throw new Error('Insufficient funds');
+        }
+        const newBalance = currentUser.cashBalance - amount;
+        const newNetDeposits = (currentUser.netDeposits || 0) - amount;
+        await updateUser({ cashBalance: newBalance, netDeposits: newNetDeposits });
 
         // Show local notification (only to self)
         if (shouldShowNotification('WITHDRAW')) {

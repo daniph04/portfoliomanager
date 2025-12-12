@@ -42,7 +42,11 @@ export default function SetupPage() {
 
         setIsSubmitting(true);
         try {
-            await updateUser({ cashBalance: value });
+            // FINTECH FIX: Initialize netDeposits = initial cash
+            await updateUser({
+                cashBalance: value,
+                netDeposits: value  // Track initial deposit
+            });
             setStep("group");
         } catch (error) {
             console.error("Error updating user:", error);
@@ -187,8 +191,8 @@ export default function SetupPage() {
                                 <button
                                     onClick={() => { setGroupMode("create"); setGroupError(""); }}
                                     className={`flex-1 py-3 rounded-xl font-medium transition-all ${groupMode === "create"
-                                            ? "bg-emerald-600 text-white"
-                                            : "bg-slate-800 text-slate-400 hover:text-white"
+                                        ? "bg-emerald-600 text-white"
+                                        : "bg-slate-800 text-slate-400 hover:text-white"
                                         }`}
                                 >
                                     Create Group
@@ -196,8 +200,8 @@ export default function SetupPage() {
                                 <button
                                     onClick={() => { setGroupMode("join"); setGroupError(""); }}
                                     className={`flex-1 py-3 rounded-xl font-medium transition-all ${groupMode === "join"
-                                            ? "bg-emerald-600 text-white"
-                                            : "bg-slate-800 text-slate-400 hover:text-white"
+                                        ? "bg-emerald-600 text-white"
+                                        : "bg-slate-800 text-slate-400 hover:text-white"
                                         }`}
                                 >
                                     Join Group
