@@ -315,21 +315,17 @@ export default function LeaderboardTab({
                                     formatter={(value: number, name: string) => [`${value.toFixed(2)}%`, name]}
                                 />
                                 <Legend />
-                                {rankings.map((entry, idx) => {
-                                    const isLeader = idx === 0;
-                                    return (
-                                        <Line
-                                            key={entry.member.id}
-                                            type="monotone"
-                                            dataKey={entry.member.name}
-                                            stroke={isLeader ? "#f59e0b" : getMemberColor(entry.member.colorHue)}
-                                            strokeWidth={isLeader ? 4 : 2}
-                                            dot={{ r: isLeader ? 6 : 4, fill: isLeader ? "#f59e0b" : getMemberColor(entry.member.colorHue) }}
-                                            activeDot={{ r: isLeader ? 10 : 6 }}
-                                            style={isLeader ? { filter: "drop-shadow(0 0 4px rgba(245, 158, 11, 0.5))" } : undefined}
-                                        />
-                                    );
-                                })}
+                                {rankings.map((entry) => (
+                                    <Line
+                                        key={entry.member.id}
+                                        type="monotone"
+                                        dataKey={entry.member.name}
+                                        stroke={getMemberColor(entry.member.colorHue)}
+                                        strokeWidth={2.5}
+                                        dot={{ r: 3, fill: getMemberColor(entry.member.colorHue) }}
+                                        activeDot={{ r: 6 }}
+                                    />
+                                ))}
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
