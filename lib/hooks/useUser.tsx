@@ -273,9 +273,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
         const init = async () => {
             try {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (isMounted && user) {
-                    setAuthUser(user);
+                // Use getSession() instead of getUser() for faster local session check
+                const { data: { session } } = await supabase.auth.getSession();
+                if (isMounted && session?.user) {
+                    setAuthUser(session.user);
                 }
             } catch (error) {
                 console.error('Auth init error:', error);
@@ -284,7 +285,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
                     setIsLoading(false);
                 }
             }
-        };
+        }
 
         init();
 
