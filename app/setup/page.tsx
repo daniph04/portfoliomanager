@@ -37,7 +37,8 @@ export default function SetupPage() {
     }, [isLoading, isAuthenticated, router]);
 
     const handleValueSubmit = async () => {
-        const value = parseFloat(portfolioValue.replace(/[^0-9.]/g, ""));
+        // Remove all non-numeric characters (including commas) and parse
+        const value = parseFloat(portfolioValue.replace(/[^0-9]/g, ""));
         if (isNaN(value) || value < 0) return;
 
         setIsSubmitting(true);
@@ -53,6 +54,22 @@ export default function SetupPage() {
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    // Handle input change with auto-formatting
+    const handleValueChange = (inputValue: string) => {
+        // Remove all non-numeric characters
+        const numericOnly = inputValue.replace(/[^0-9]/g, "");
+
+        if (numericOnly === "") {
+            setPortfolioValue("");
+            return;
+        }
+
+        // Parse number and format with commas
+        const number = parseInt(numericOnly, 10);
+        const formatted = number.toLocaleString("en-US");
+        setPortfolioValue(formatted);
     };
 
     const handleGroupSubmit = async () => {
@@ -149,8 +166,8 @@ export default function SetupPage() {
                                 </span>
                                 <input
                                     type="text"
-                                    value={formatCurrency(portfolioValue)}
-                                    onChange={(e) => setPortfolioValue(e.target.value)}
+                                    value={portfolioValue}
+                                    onChange={(e) => handleValueChange(e.target.value)}
                                     placeholder="0"
                                     className="w-full pl-12 pr-4 py-5 bg-slate-800 border-2 border-slate-700 focus:border-emerald-500 rounded-2xl text-4xl font-bold text-slate-100 placeholder-slate-600 focus:outline-none transition-all text-center"
                                     autoFocus
