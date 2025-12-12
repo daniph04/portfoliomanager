@@ -120,8 +120,8 @@ export default function DashboardPage() {
         const holdingsCost = userHoldings.reduce((sum, h) => sum + (h.quantity * h.avgBuyPrice), 0);
 
         return {
-            totalValue: holdingsValue + user.cashBalance,
-            costBasis: holdingsCost + user.cashBalance,
+            totalValue: holdingsValue + user.cashBalance,  // Total portfolio value
+            costBasis: holdingsCost,  // Cost basis of holdings only (not cash)
         };
     }, [holdings, users]);
 
