@@ -307,12 +307,38 @@ export default function MyPortfolioTab({
                 )}
 
                 {/* Holdings List */}
-                <div className="flex-1 space-y-4">
+                <div className="flex-1 space-y-6">
+                    {/* Empty State - Show when user has no holdings (100% cash only) */}
+                    {myHoldings.length === 0 && (
+                        <div className="bg-gradient-to-br from-emerald-500/10 via-slate-900/50 to-slate-900/50 border border-emerald-500/20 rounded-3xl p-8 md:p-10">
+                            <div className="max-w-2xl mx-auto text-center">
+                                <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <span className="text-4xl">💰</span>
+                                </div>
+                                <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
+                                    Your portfolio is ready — you&apos;re starting with {formatCurrency(metrics.currentValue)}
+                                </h2>
+                                <p className="text-slate-400 text-base mb-8 max-w-lg mx-auto">
+                                    Right now everything is in cash. Add your real stock, ETF or crypto positions whenever you&apos;re ready.
+                                </p>
+                                <button
+                                    onClick={handleAddHolding}
+                                    className="bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold py-4 px-8 rounded-xl transition-all shadow-lg shadow-emerald-500/30 inline-flex items-center gap-2"
+                                >
+                                    <span className="text-xl leading-none">+</span>
+                                    Add your first position
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Main Header */}
                     <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-bold text-white">Your Positions</h3>
-                        <span className="text-xs font-medium text-slate-500 bg-slate-800 px-2 py-1 rounded-lg">
-                            {myHoldings.length} Assets
-                        </span>
+                        <div>        <h3 className="text-lg font-bold text-white">Your Positions</h3>
+                            <span className="text-xs font-medium text-slate-500 bg-slate-800 px-2 py-1 rounded-lg">
+                                {myHoldings.length} Assets
+                            </span>
+                        </div>
                     </div>
 
                     {myHoldings.length === 0 ? (

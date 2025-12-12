@@ -136,10 +136,10 @@ export default function SetupPage() {
                             Welcome, {currentUser?.name}! 👋
                         </h1>
                         <p className="text-slate-400 mb-2 text-lg">
-                            What&apos;s the total value of the portfolio you want to track here?
+                            How much are all your investments worth today?
                         </p>
                         <p className="text-slate-500 text-sm mb-8">
-                            Include both cash and existing investments (stocks, ETFs, crypto)
+                            Include both cash and existing investments (stocks, ETFs and crypto)
                         </p>
 
                         <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl">
@@ -158,7 +158,7 @@ export default function SetupPage() {
                             </div>
 
                             <p className="text-slate-500 text-sm mb-6">
-                                We&apos;ll treat this as your starting cash balance inside Portfolio League so you can recreate your current positions.
+                                We&apos;ll treat this as your starting balance inside Portfolio League so you can recreate your positions here over time.
                             </p>
 
                             <button
