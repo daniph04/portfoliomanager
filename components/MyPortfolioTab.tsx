@@ -341,23 +341,8 @@ export default function MyPortfolioTab({
                         </div>
                     </div>
 
-                    {myHoldings.length === 0 ? (
-                        <div className="bg-slate-900/50 border border-dashed border-slate-800 rounded-3xl p-10 text-center">
-                            <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
-                                🚀
-                            </div>
-                            <h3 className="text-white font-bold mb-2">Start Investing</h3>
-                            <p className="text-slate-400 text-sm mb-6 max-w-xs mx-auto">
-                                Add your first stock or crypto position to begin tracking your performance.
-                            </p>
-                            <button
-                                onClick={handleAddHolding}
-                                className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl transition-colors shadow-lg shadow-emerald-500/20"
-                            >
-                                Add Position
-                            </button>
-                        </div>
-                    ) : (
+                    {/* Don't show the old empty state when we're already showing the main one */}
+                    {myHoldings.length > 0 && (
                         <div className="space-y-3">
                             {myHoldings.map((holding) => {
                                 const holdingValue = holding.quantity * holding.currentPrice;
