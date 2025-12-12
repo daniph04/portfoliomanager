@@ -92,13 +92,22 @@ const computeCurrentValue = (member: Member, holdings: Holding[]): number => {
 };
 
 /**
- * FINTECH-GRADE ALL TIME BASELINE
+ * FINTECH-GRADE ALL TIME BASELINE (Fixed in Round 5)
  * 
- * Baseline = Cost Basis of Positions + Net Deposits
+ * Baseline = Net Deposits ONLY
  * 
- * This ensures that deposits/withdrawals don't affect P&L %:
- * - When you deposit $5k, both currentValue and baseline increase by $5k → P&L % unchanged
- * - When you withdraw $2k, both decrease by $2k → P&L % unchanged
+ * WHY: netDeposits already represents the total capital contributed by the user.
+ * Cost basis is what you SPENT from that capital, not additional capital.
+ * 
+ * Example:
+ * - Deposit $5,000 → netDeposits = 5000
+ * - Buy AAPL for $2,000 → cash -= 2000, costBasis = 2000
+ * - Baseline = 5000 (NOT 5000 + 2000!)
+ * 
+ * When you sell AAPL at $2,278:
+ * - currentValue = 5,278 (cash + holdings)
+ * - baseline = 5,000 (only deposits)
+ * - P&L = +$278 (~+5.56%)
  * 
  * netDeposits = Σ(deposits) - Σ(withdrawals)
  */
@@ -107,16 +116,10 @@ const computeAllTimeBaseline = (
     holdings: Holding[],
     history: PortfolioSnapshot[] = []
 ): number => {
-    // Cost basis of all positions
-    const costBasisPositions = holdings
-        .filter(h => h.memberId === member.id)
-        .reduce((sum, h) => sum + h.quantity * h.avgBuyPrice, 0);
-
-    // Net deposits (total contributions)
+    // Baseline = ONLY net contributions
+    // Do NOT add cost basis - that would double-count the capital
     const netDeposits = member.netDeposits || 0;
-
-    // Baseline = what you put in (cost + contributions)
-    return costBasisPositions + netDeposits;
+    return netDeposits;
 };
 
 /**

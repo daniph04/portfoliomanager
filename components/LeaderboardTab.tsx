@@ -247,6 +247,29 @@ export default function LeaderboardTab({
                 </div>
             </div>
 
+            {/* Season Controls - Only shown to group leader */}
+            {isLeader && !currentSeason && (
+                <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-500/30 rounded-3xl p-6 mb-6">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-2xl">🏆</span>
+                                <h3 className="text-xl font-bold text-white">Ready to compete?</h3>
+                            </div>
+                            <p className="text-slate-400 text-sm leading-relaxed">
+                                Start a season to track P&L from this moment. All members will start at 0% and compete from today forward.
+                            </p>
+                        </div>
+                        <button
+                            onClick={onStartSeason}
+                            className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-bold shadow-lg hover:shadow-xl transition-all whitespace-nowrap"
+                        >
+                            Start Season
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Race Chart */}
             {hasAnyHoldings && rankings.length > 0 && (
                 <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl p-4 md:p-6">

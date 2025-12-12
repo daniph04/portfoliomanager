@@ -63,6 +63,23 @@ export default function PerformanceChart({
         const filtered = normalized.filter(p => p.timestamp >= cutoff);
         const working = filtered.length > 0 ? filtered : normalized;
 
+        // ROUND 5 FIX: Detect empty/neutral state
+        // Don't show scary -100% red line for portfolios with no meaningful data
+        const hasNoMeaningfulData = (
+            working.length === 0 ||
+            (mode === "allTime" && (seasonBaseline ?? 0) < 1 && working.every(p => p.value === 0)) ||
+            (mode === "season" && (seasonBaseline ?? 0) < 1)
+        );
+
+        if (hasNoMeaningfulData) {
+            // Return neutral flat line at 0%
+            const now = Date.now();
+            return [
+                { timestamp: now - 86400000, value: 0, pct: 0 }, // Yesterday
+                { timestamp: now, value: 0, pct: 0 }, // Now
+            ];
+        }
+
         // Determine base value (season baseline or first point)
         let baseValue: number | undefined;
         if (mode === "season") {
@@ -90,12 +107,13 @@ export default function PerformanceChart({
             ];
         }
 
-        const safeBase = baseValue > 0 ? baseValue : data[0].value || 1;
+        // Use safePlPct logic: if baseline too small, return 0% (not division by zero)
+        const safeBase = baseValue > 1 ? baseValue : undefined;
 
         return data.map(point => ({
             timestamp: point.timestamp,
             value: point.value,
-            pct: safeBase > 0 ? ((point.value - safeBase) / safeBase) * 100 : 0,
+            pct: safeBase ? ((point.value - safeBase) / safeBase) * 100 : 0,
         }));
     }, [snapshots, scope, entityId, cutoff, mode, seasonBaseline, seasonStart]);
 
