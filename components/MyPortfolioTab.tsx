@@ -233,7 +233,6 @@ export default function MyPortfolioTab({
                         seasonStart={displayMode === "season" && currentSeason ? new Date(currentSeason.startTime).getTime() : undefined}
                         showControls
                         onTimeframeChange={setTimeframe}
-                        className="h-64"
                     />
                 </div>
             </div>

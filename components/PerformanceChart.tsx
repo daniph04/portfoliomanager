@@ -31,8 +31,8 @@ export default function PerformanceChart({
     seasonBaseline,
     seasonStart,
     className = "",
-    height = 260,
-    showControls = true,
+    height = 220, // Reduced from 280 to leave room for controls below
+    showControls = false,
     onTimeframeChange,
 }: PerformanceChartProps) {
     const [showPercentage, setShowPercentage] = useState(true);

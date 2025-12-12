@@ -287,7 +287,7 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                     </div>
 
                     {/* Chart */}
-                    <div className="h-64 w-full relative -mx-2">
+                    <div className="w-full relative -mx-2">
                         <PerformanceChart
                             snapshots={chartSnapshots}
                             scope="group"
