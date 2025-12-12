@@ -114,6 +114,17 @@ export function formatPercent(value: number, decimals: number = 2): string {
 }
 
 /**
+ * Format percentage with null-safe handling (fintech-grade)
+ * Returns "--" if value is null (baseline too small)
+ */
+export function formatPercentSafe(value: number | null, decimals: number = 2): string {
+    if (value === null || value === undefined) {
+        return "--";
+    }
+    return formatPercent(value, decimals);
+}
+
+/**
  * Format ISO timestamp to readable date/time
  */
 export function formatDateTime(isoString: string): string {

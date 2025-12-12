@@ -215,6 +215,7 @@ export default function DashboardPage() {
             colorHue: Math.abs(u.name.charCodeAt(0) * 137) % 360,
             cashBalance: u.cashBalance,
             totalRealizedPnl: u.totalRealizedPnl,
+            netDeposits: u.cashBalance, // Default: assume existing users deposited their cash
             createdAt: u.createdAt,
         })),
         holdings: holdings.map(h => ({

@@ -234,7 +234,7 @@ export function usePersistentGroupData(): {
                         parsed.groups.push(nanosectaGroup);
                     }
 
-                    // MIGRATION: Fix members with missing or zero initialCapital
+                    // MIGRATION: Fix members with missing or zero initialCapital AND netDeposits
                     if (parsed.groups) {
                         parsed.groups = parsed.groups.map((g: GroupState) => ({
                             ...g,
@@ -253,6 +253,14 @@ export function usePersistentGroupData(): {
                                         ...m,
                                         initialCapital: computedInitialCapital > 0 ? computedInitialCapital : m.cashBalance,
                                         initialValue: computedInitialCapital > 0 ? computedInitialCapital : m.cashBalance,
+                                        netDeposits: m.netDeposits !== undefined ? m.netDeposits : m.cashBalance, // Initialize netDeposits
+                                    };
+                                }
+                                // If netDeposits is undefined, initialize it to current cashBalance (legacy data)
+                                if (m.netDeposits === undefined) {
+                                    return {
+                                        ...m,
+                                        netDeposits: m.cashBalance, // Best guess: they deposited their current cash
                                     };
                                 }
                                 return m;
@@ -407,6 +415,7 @@ export function usePersistentGroupData(): {
             initialCapital: initialValue, // Set initial capital to true starting value
             initialValue,
             totalRealizedPnl: 0,
+            netDeposits: input.initialCash, // Track initial cash as first deposit
             createdAt: new Date().toISOString(),
         };
 
@@ -497,6 +506,7 @@ export function usePersistentGroupData(): {
             initialCapital: 0, // Default for empty
             initialValue: 0,
             totalRealizedPnl: 0,
+            netDeposits: 0, // No deposits yet
             createdAt: new Date().toISOString(),
         };
 
@@ -550,7 +560,7 @@ export function usePersistentGroupData(): {
         });
     }, [session, updateGroup]);
 
-    // Deposit cash
+    // Deposit cash (increases both cashBalance AND netDeposits)
     const depositCash = useCallback((memberId: string, amount: number, note?: string) => {
         if (!session?.groupId) return;
 
@@ -561,7 +571,11 @@ export function usePersistentGroupData(): {
                 ...prev,
                 members: prev.members.map(m =>
                     m.id === memberId
-                        ? { ...m, cashBalance: m.cashBalance + amount }
+                        ? {
+                            ...m,
+                            cashBalance: m.cashBalance + amount,
+                            netDeposits: (m.netDeposits || 0) + amount // Track net contribution
+                        }
                         : m
                 ),
                 activity: [{

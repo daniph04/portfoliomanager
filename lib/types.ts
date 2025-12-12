@@ -24,6 +24,7 @@ export interface Member {
     colorHue: number;           // 0-360 for HSL color generation
     cashBalance: number;        // Uninvested cash
     totalRealizedPnl: number;   // Cumulative realized P/L from all sales
+    netDeposits: number;        // Total deposits - total withdrawals (contributions baseline)
     initialCapital?: number;    // The starting bankroll (fixed when joining) - legacy
     initialValue?: number;      // Explicit all-time baseline (cash + cost basis at join)
     avatarInitials?: string;    // e.g. "DP"

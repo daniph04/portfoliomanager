@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { GroupState, Holding, Season } from "@/lib/types";
 import { GroupDataHelpers } from "@/lib/useGroupData";
-import { formatCurrency, formatPercent, getMemberColor, getHoldingPnl, getHoldingPnlPercent, getTotalCostBasis, getMemberHoldings, getTotalPortfolioValue } from "@/lib/utils";
+import { formatCurrency, formatPercent, formatPercentSafe, getMemberColor, getHoldingPnl, getHoldingPnlPercent, getTotalCostBasis, getMemberHoldings, getTotalPortfolioValue } from "@/lib/utils";
 import { getMetricsForMode, MetricsMode } from "@/lib/portfolioMath";
 import HoldingFormModal from "./HoldingFormModal";
 import SellConfirmModal from "./SellConfirmModal";
@@ -207,18 +207,16 @@ export default function MyPortfolioTab({
                             </div>
                             <div className="text-xs text-slate-500 mt-1">
                                 {displayMode === "season"
-                                    ? `Season start: ${formatCurrency(metrics.baseline)} · Season: ${formatCurrency(metrics.plAbs)} (${formatPercent(metrics.plPct)})`
-                                    : `Initial: ${formatCurrency(metrics.baseline)} · All Time: ${formatCurrency(metrics.plAbs)} (${formatPercent(metrics.plPct)})`}
+                                    ? `Season start: ${formatCurrency(metrics.baseline)} · Season: ${formatCurrency(metrics.plAbs)} (${formatPercentSafe(metrics.plPct)})`
+                                    : `Initial: ${formatCurrency(metrics.baseline)} · All Time: ${formatCurrency(metrics.plAbs)} (${formatPercentSafe(metrics.plPct)})`}
                             </div>
                         </div>
                         <div className="text-right">
                             <div className="text-sm text-slate-400 font-medium mb-1">Total Return</div>
-                            <div className={`text-3xl font-bold tracking-tight ${metrics.plAbs >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                {metrics.plAbs >= 0 ? "+" : ""}{formatCurrency(metrics.plAbs)}
+                            <div className={`text-3xl font-bold ${metrics.plPct !== null && metrics.plPct >= 0 ? 'text-emerald-400' : metrics.plPct !== null ? 'text-red-400' : 'text-slate-400'}`}>
+                                {metrics.plAbs >= 0 ? "+" : ""}{formatCurrency(metrics.plAbs, 0)}
                             </div>
-                            <div className={`text-sm font-medium ${metrics.plAbs >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                                {metrics.plAbs >= 0 ? "▲" : "▼"} {formatPercent(Math.abs(metrics.plPct))}
-                            </div>
+                            <div className="text-sm text-slate-400">{formatPercentSafe(metrics.plPct, 1)}</div>
                         </div>
                     </div>
                 </div>

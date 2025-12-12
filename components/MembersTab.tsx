@@ -6,7 +6,7 @@ import { GroupDataHelpers } from "@/lib/useGroupData";
 import {
     getMemberHoldings, getTotalPortfolioValue, getTotalPnl, getTotalPnlPercent,
     getHoldingPnl, getHoldingPnlPercent, getHoldingValue, getAssetClassBreakdown,
-    formatCurrency, formatPercent, getMemberColor, getTotalCostBasis
+    formatCurrency, formatPercent, formatPercentSafe, getMemberColor, getTotalCostBasis
 } from "@/lib/utils";
 import { getMetricsForMode, MetricsMode } from "@/lib/portfolioMath";
 import HoldingFormModal from "./HoldingFormModal";
@@ -360,7 +360,7 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                                 <div className="bg-slate-800/50 rounded-xl p-3">
                                     <div className="text-xs text-slate-500 uppercase">P/L</div>
                                     <div className={`text-lg font-bold ${plAbs >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                        {plAbs >= 0 ? "+" : ""}{formatCurrency(plAbs, 0)} ({formatPercent(plPct, 1)})
+                                        {plAbs >= 0 ? "+" : ""}{formatCurrency(plAbs, 0)} ({formatPercentSafe(plPct, 1)})
                                     </div>
                                 </div>
                             </div>

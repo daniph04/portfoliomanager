@@ -55,49 +55,76 @@ export function computeInvestorMetrics(member: Member, holdings: Holding[]) {
     };
 }
 
-const getEarliestSnapshotValue = (
-    snapshots: PortfolioSnapshot[],
-    memberId: string
-): number | null => {
-    const filtered = snapshots
-        .filter(s => (s.entityId || s.memberId) === memberId)
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+/**
+ * FINTECH-GRADE P&L PERCENTAGE CALCULATION
+ * 
+ * Safely calculates P&L percentage, handling edge cases where baseline is too small.
+ * Returns null when baseline is too small to avoid showing absurd percentages like +10000% or -100%.
+ * 
+ * @param plAbs Absolute P&L ($)
+ * @param baseline Starting value ($)
+ * @returns P&L percentage, or null if baseline is too small (UI should show "--")
+ */
+export function safePlPct(plAbs: number, baseline: number): number | null {
+    // If baseline is very small (< $1), don't show percentage
+    if (!baseline || Math.abs(baseline) < 1) {
+        return null; // UI will show "--"
+    }
 
-    if (filtered.length === 0) return null;
+    const pct = (plAbs / baseline) * 100;
 
-    // Prefer costBasis when available to avoid using mark-to-market as the baseline
-    const first = filtered[0];
-    if (typeof first.costBasis === "number") return first.costBasis;
-    return first.totalValue;
-};
+    // Clamp to avoid absurd values
+    // If someone has $1 baseline and makes $10000, that's +1,000,000% - not useful
+    if (pct > 1000 || pct < -100) {
+        return null; // UI will show "--"
+    }
 
+    return pct;
+}
+
+/**
+ * Computes current portfolio value (holdings at market price + cash).
+ */
 const computeCurrentValue = (member: Member, holdings: Holding[]): number => {
     const memberHoldings = holdings.filter(h => h.memberId === member.id);
     const investedValue = memberHoldings.reduce((sum, h) => sum + h.quantity * h.currentPrice, 0);
     return member.cashBalance + investedValue;
 };
 
+/**
+ * FINTECH-GRADE ALL TIME BASELINE
+ * 
+ * Baseline = Cost Basis of Positions + Net Deposits
+ * 
+ * This ensures that deposits/withdrawals don't affect P&L %:
+ * - When you deposit $5k, both currentValue and baseline increase by $5k → P&L % unchanged
+ * - When you withdraw $2k, both decrease by $2k → P&L % unchanged
+ * 
+ * netDeposits = Σ(deposits) - Σ(withdrawals)
+ */
 const computeAllTimeBaseline = (
     member: Member,
     holdings: Holding[],
     history: PortfolioSnapshot[] = []
 ): number => {
-    // If the member has an explicit baseline, use it (captured at join: cost basis + cash)
-    if (member.initialValue !== undefined) return member.initialValue;
-    if (member.initialCapital !== undefined) return member.initialCapital;
-
-    // Fall back to earliest recorded snapshot (cost basis preferred)
-    const earliestSnapshot = getEarliestSnapshotValue(history, member.id);
-    if (earliestSnapshot !== null) return earliestSnapshot;
-
-    // Final fallback: current cost basis + current cash (still cost-based, not market-based)
-    const holdingsCost = holdings
+    // Cost basis of all positions
+    const costBasisPositions = holdings
         .filter(h => h.memberId === member.id)
         .reduce((sum, h) => sum + h.quantity * h.avgBuyPrice, 0);
 
-    return member.cashBalance + holdingsCost;
+    // Net deposits (total contributions)
+    const netDeposits = member.netDeposits || 0;
+
+    // Baseline = what you put in (cost + contributions)
+    return costBasisPositions + netDeposits;
 };
 
+/**
+ * SEASON BASELINE
+ * 
+ * When season starts, we snapshot the current portfolio value.
+ * P&L during season = currentValue - seasonSnapshot
+ */
 const computeSeasonBaseline = (
     member: Member,
     holdings: Holding[],
@@ -136,7 +163,7 @@ export interface UnifiedMetrics {
     currentValue: number;      // Portfolio value right now
     baseline: number;          // Starting point (allTime or season)
     plAbs: number;             // P&L absolute ($)
-    plPct: number;             // P&L percentage
+    plPct: number | null;      // P&L percentage (null = show "--" in UI)
     modeLabel: string;         // "All Time" or season name
     mode: MetricsMode;         // Which mode these metrics are for
     portfolioValue: number;    // Same as currentValue
@@ -164,7 +191,7 @@ export function getMetricsForMode(
     const usingSeason = mode === "season" && !!season;
     const baseline = usingSeason ? seasonBaseline : allTimeBaseline;
     const plAbs = currentValue - baseline;
-    const plPct = baseline > 0 ? (plAbs / baseline) * 100 : 0;
+    const plPct = safePlPct(plAbs, baseline); // Can be null!
 
     return {
         currentValue,
@@ -198,7 +225,7 @@ export function getGroupMetricsForMode(
     const investedValue = memberMetrics.reduce((sum, m) => sum + m.investedValue, 0);
 
     const plAbs = currentValue - baseline;
-    const plPct = baseline > 0 ? (plAbs / baseline) * 100 : 0;
+    const plPct = safePlPct(plAbs, baseline); // Can be null!
 
     return {
         currentValue,
@@ -219,3 +246,4 @@ export function getGroupMetricsForMode(
  * Convenience export for mode type to keep imports stable.
  */
 export type { MetricsMode };
+

@@ -42,11 +42,15 @@ export default function LeaderboardTab({
             const costBasis = getTotalCostBasis(memberHoldings);
             return {
                 member,
+                memberHoldings,
                 totalValue: metrics.currentValue,
                 costBasis,
                 baseline: metrics.baseline,
                 pnl: metrics.plAbs,
-                pnlPercent: metrics.plPct,
+                pnlPercent: metrics.plPct ?? 0, // Treat null as 0 for sorting
+                plAbs: metrics.plAbs,
+                portfolioValue: metrics.portfolioValue,
+                investedValue: metrics.investedValue,
                 holdingCount: memberHoldings.length,
             };
         }).sort((a, b) => b.pnlPercent - a.pnlPercent);

@@ -10,6 +10,8 @@ import {
     getAssetClassBreakdown,
     formatCurrency,
     formatPercent,
+    formatPercentSafe,
+    getMemberColor,
     getTotalCostBasis,
     getMemberHoldings
 } from "@/lib/utils";
@@ -269,8 +271,8 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                                     ? `Season start: ${formatCurrency(metrics.baseline)}`
                                     : `Initial: ${formatCurrency(metrics.baseline)}`}
                             </div>
-                            <div className={`text-sm font-bold mt-1 ${metrics.plAbs >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                                {metrics.plAbs >= 0 ? "▲" : "▼"} {formatPercent(Math.abs(metrics.plPct))}
+                            <div className={`text-sm font-bold mt-1 ${metrics.plPct !== null && metrics.plPct >= 0 ? "text-emerald-500" : metrics.plPct !== null ? "text-red-500" : "text-slate-400"}`}>
+                                {metrics.plPct !== null ? (metrics.plPct >= 0 ? "▲" : "▼") : ""} {formatPercentSafe(metrics.plPct)}
                             </div>
                         </div>
                         <div className="md:text-right">
