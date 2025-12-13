@@ -25,8 +25,8 @@ interface OverviewTabProps {
     helpers: GroupDataHelpers;
 }
 
-// Auto-refresh interval (10 seconds)
-const AUTO_REFRESH_INTERVAL = 10 * 1000;
+// Auto-refresh interval tuned to match 5-minute chart buckets
+const AUTO_REFRESH_INTERVAL = 2 * 60 * 1000;
 
 export default function OverviewTab({ group, helpers }: OverviewTabProps) {
     const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);

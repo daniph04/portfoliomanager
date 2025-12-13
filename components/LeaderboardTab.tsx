@@ -7,7 +7,7 @@ import { getMetricsForMode, MetricsMode } from "@/lib/portfolioMath";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 type RankingMode = "season" | "allTime";
-type Timeframe = "1D" | "1W" | "1M" | "YTD" | "ALL";
+type Timeframe = "1D" | "1W" | "1M" | "3M" | "YTD" | "ALL";
 
 interface LeaderboardTabProps {
     group: GroupState;
@@ -83,6 +83,7 @@ export default function LeaderboardTab({
                 case "1D": return now - 24 * 60 * 60 * 1000;
                 case "1W": return now - 7 * 24 * 60 * 60 * 1000;
                 case "1M": return now - 30 * 24 * 60 * 60 * 1000;
+                case "3M": return now - 90 * 24 * 60 * 60 * 1000;
                 case "YTD": return new Date(new Date().getFullYear(), 0, 1).getTime();
                 case "ALL":
                 default: return 0;
@@ -280,7 +281,7 @@ export default function LeaderboardTab({
                             <span className="text-xs font-normal text-slate-500 ml-2">· Leader in bold</span>
                         </h3>
                         <div className="flex gap-1 bg-slate-800/60 rounded-lg p-1">
-                            {(["1D", "1W", "1M", "YTD", "ALL"] as Timeframe[]).map(tf => (
+                            {(["1D", "1W", "1M", "3M", "YTD", "ALL"] as Timeframe[]).map(tf => (
                                 <button
                                     key={tf}
                                     onClick={() => setChartTimeframe(tf)}
