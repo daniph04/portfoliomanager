@@ -421,6 +421,28 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const addHolding = async (holding: Omit<UserHolding, 'id' | 'userId' | 'createdAt'>): Promise<UserHolding | null> => {
         if (!authUser) return null;
 
+        // CRITICAL: Calculate purchase cost and subtract from cash FIRST
+        const totalCost = holding.quantity * holding.avgBuyPrice;
+        const newCashBalance = (currentUser?.cashBalance || 0) - totalCost;
+
+        // Validate sufficient funds
+        if (newCashBalance < 0) {
+            console.error('Insufficient funds:', { cost: totalCost, available: currentUser?.cashBalance });
+            return null;
+        }
+
+        // 1. Update cash balance in database
+        const { error: cashError } = await supabase
+            .from('user_profiles')
+            .update({ cash_balance: newCashBalance })
+            .eq('id', authUser.id);
+
+        if (cashError) {
+            console.error('Error updating cash balance:', cashError);
+            return null;
+        }
+
+        // 2. Insert the holding
         const { data, error } = await supabase
             .from('user_holdings')
             .insert({
@@ -438,19 +460,22 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
         if (error) {
             console.error('Error adding holding:', error);
+            // Rollback cash update if holding insertion fails
+            await supabase
+                .from('user_profiles')
+                .update({ cash_balance: currentUser?.cashBalance })
+                .eq('id', authUser.id);
             return null;
         }
 
         // Show local notification
         if (shouldShowNotification('BUY') && data) {
-            const totalCost = holding.quantity * holding.avgBuyPrice;
             const notification = generateActivityNotification('BUY', currentUser?.name || 'You', holding.symbol, totalCost);
             showLocalNotification(notification);
         }
 
         // Send push to other group members
         if (currentGroupId && currentUser && data) {
-            const totalCost = holding.quantity * holding.avgBuyPrice;
             const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalCost);
             sendPushToGroup(
                 currentGroupId,
@@ -464,7 +489,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
         // Add activity event
         if (currentGroupId && data) {
-            const totalCost = holding.quantity * holding.avgBuyPrice;
             await addActivity(
                 currentGroupId,
                 'BUY',
