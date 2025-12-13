@@ -98,21 +98,48 @@ export default function GroupsPage() {
 
                 {/* Existing Groups */}
                 {userGroups.length > 0 && (
-                    <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 mb-6">
-                        <h2 className="text-lg font-semibold text-slate-100 mb-4">Your Groups</h2>
-                        <div className="space-y-2">
-                            {userGroups.map((group) => (
-                                <button
-                                    key={group.id}
-                                    onClick={() => handleSelectExistingGroup(group.id)}
-                                    className="w-full flex items-center justify-between px-4 py-3 bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors"
-                                >
-                                    <span className="font-medium text-slate-100">{group.name}</span>
-                                    <span className="text-emerald-400">→</span>
-                                </button>
-                            ))}
+                    <>
+                        {/* Empty State Hero - Only show if user has just the private group */}
+                        {userGroups.length === 1 && userGroups[0].type === 'private' && (
+                            <div className="bg-gradient-to-br from-slate-900/90 to-slate-800/90 backdrop-blur-xl border border-emerald-500/20 rounded-3xl p-12 mb-6 text-center relative overflow-hidden">
+                                {/* Background decoration */}
+                                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-blue-500/5 to-purple-500/5 pointer-events-none" />
+
+                                <div className="relative">
+                                    <div className="text-6xl mb-6">🎯</div>
+                                    <h2 className="text-2xl font-bold text-white mb-3">
+                                        Play Portfolio League with Friends
+                                    </h2>
+                                    <p className="text-slate-400 mb-8 max-w-md mx-auto px-4">
+                                        Right now you&apos;re in your own league. Create a new league for your group chat or join one with an invite code.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 mb-6">
+                            <h2 className="text-lg font-semibold text-slate-100 mb-4">Your Leagues</h2>
+                            <div className="space-y-2">
+                                {userGroups.map((group) => (
+                                    <button
+                                        key={group.id}
+                                        onClick={() => handleSelectExistingGroup(group.id)}
+                                        className="w-full flex items-center justify-between px-4 py-3 bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-medium text-slate-100">{group.name}</span>
+                                            {group.type === 'private' && (
+                                                <span className="text-xs text-slate-500 bg-slate-700/50 px-2 py-0.5 rounded">
+                                                    Private
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="text-emerald-400">→</span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    </>
                 )}
 
                 {/* Join/Create Card */}

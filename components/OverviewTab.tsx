@@ -34,6 +34,12 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
     const [displayMode, setDisplayMode] = useState<MetricsMode>("allTime");
     const [timeframe, setTimeframe] = useState<Timeframe>("1M");
 
+    // Dismissable banner for private groups
+    const [bannerDismissed, setBannerDismissed] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        return localStorage.getItem('privateGroupBannerDismissed') === 'true';
+    });
+
     // Get current season if active
     const currentSeason = useMemo(() => {
         if (!group.currentSeasonId) return null;
@@ -230,6 +236,56 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                             </button>
                         )}
                     </div>
+
+                    {/* Private Group Banner - Dismissable */}
+                    {group.type === 'private' && !bannerDismissed && (
+                        <div className="bg-gradient-to-r from-emerald-500/10 via-blue-500/10 to-purple-500/10 border border-emerald-500/20 rounded-2xl p-6 mb-6 relative overflow-hidden">
+                            {/* Subtle background glow */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />
+
+                            <div className="relative flex items-start justify-between gap-4">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <span className="text-2xl">🏠</span>
+                                        <h3 className="text-lg font-bold text-white">
+                                            You&apos;re in your own league
+                                        </h3>
+                                    </div>
+                                    <p className="text-slate-400 text-sm mb-4 max-w-2xl">
+                                        Create or join a league to compete with friends on real returns. Track your portfolios together and see who&apos;s winning!
+                                    </p>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => window.location.href = '/groups'}
+                                            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-lg transition-colors shadow-lg shadow-emerald-500/20"
+                                        >
+                                            + Create a League
+                                        </button>
+                                        <button
+                                            onClick={() => window.location.href = '/groups'}
+                                            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-sm font-medium rounded-lg transition-colors border border-slate-700"
+                                        >
+                                            Join a League
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Dismiss button */}
+                                <button
+                                    onClick={() => {
+                                        localStorage.setItem('privateGroupBannerDismissed', 'true');
+                                        setBannerDismissed(true);
+                                    }}
+                                    className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 text-slate-500 hover:text-white transition-colors"
+                                    aria-label="Dismiss"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Mode Toggle */}
                     <div className="flex gap-1 mb-6 bg-slate-800/50 rounded-lg p-1 w-fit">

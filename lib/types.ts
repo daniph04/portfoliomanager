@@ -99,6 +99,7 @@ export interface UserSession {
 export interface GroupState {
     id: string;
     name: string;               // Group name for display
+    type?: 'private' | 'shared';  // Optional for backwards compat, private = solo, shared = multi-member
     members: Member[];
     holdings: Holding[];        // Flat array, each holding has memberId
     activity: ActivityEvent[];

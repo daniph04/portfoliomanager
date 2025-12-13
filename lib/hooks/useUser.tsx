@@ -52,6 +52,7 @@ export interface UserHolding {
 export interface Group {
     id: string;
     name: string;
+    type?: 'private' | 'shared';
     createdBy: string;
     createdAt: string;
 }
