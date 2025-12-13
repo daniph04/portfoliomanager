@@ -229,6 +229,7 @@ export default function MyPortfolioTab({
                         entityId={currentProfileId}
                         timeframe={timeframe}
                         mode={displayMode}
+                        netDeposits={currentMember?.netDeposits || 0}
                         seasonBaseline={displayMode === "season" ? metrics.baseline : undefined}
                         seasonStart={displayMode === "season" && currentSeason ? new Date(currentSeason.startTime).getTime() : undefined}
                         showControls

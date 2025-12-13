@@ -397,6 +397,7 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
                                     entityId={selectedMember.id}
                                     timeframe={timeframe}
                                     mode={displayMode}
+                                    netDeposits={selectedMember.netDeposits || 0}
                                     seasonBaseline={displayMode === "season" ? metrics.baseline : undefined}
                                     seasonStart={displayMode === "season" && currentSeason ? new Date(currentSeason.startTime).getTime() : undefined}
                                     showControls

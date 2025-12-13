@@ -14,6 +14,7 @@ interface PerformanceChartProps {
     entityId: string;
     timeframe: Timeframe;
     mode: MetricsMode;
+    netDeposits: number;  // Initial investment - baseline for % calculations
     seasonBaseline?: number;
     seasonStart?: number;
     className?: string;
@@ -28,6 +29,7 @@ export default function PerformanceChart({
     entityId,
     timeframe,
     mode,
+    netDeposits,
     seasonBaseline,
     seasonStart,
     className = "",
@@ -63,43 +65,29 @@ export default function PerformanceChart({
         const filtered = normalized.filter(p => p.timestamp >= cutoff);
         const working = filtered.length > 0 ? filtered : normalized;
 
-        // ROUND 5 FIX: Detect empty/neutral state
-        // Don't show scary -100% red line for portfolios with no meaningful data
-        const hasNoMeaningfulData = (
-            working.length === 0 ||
-            (mode === "allTime" && (seasonBaseline ?? 0) < 1 && working.every(p => p.value === 0)) ||
-            (mode === "season" && (seasonBaseline ?? 0) < 1)
-        );
+        // Determine baseline value
+        let baseValue: number;
 
-        if (hasNoMeaningfulData) {
-            // Return neutral flat line at 0%
-            const now = Date.now();
-            return [
-                { timestamp: now - 86400000, value: 0, pct: 0 }, // Yesterday
-                { timestamp: now, value: 0, pct: 0 }, // Now
-            ];
-        }
-
-        // Determine base value (season baseline or first point)
-        let baseValue: number | undefined;
         if (mode === "season") {
-            if (seasonBaseline !== undefined) {
-                baseValue = seasonBaseline;
-            } else if (seasonStart) {
-                const anchor = working.find(p => p.timestamp >= seasonStart);
-                baseValue = anchor?.value ?? working[0]?.value;
-            }
-        }
-        if (baseValue === undefined) {
-            baseValue = working[0]?.value ?? 0;
+            // Season mode: use seasonBaseline if provided
+            baseValue = seasonBaseline ?? netDeposits;
+        } else {
+            // All Time mode: ALWAYS use netDeposits as baseline
+            baseValue = netDeposits;
         }
 
-        let data = working.length > 0 ? working : [{
-            timestamp: Date.now(),
-            value: baseValue,
-            costBasis: baseValue,
-        }];
+        // If no snapshots, create baseline point at netDeposits (0%)
+        if (working.length === 0) {
+            return [{
+                timestamp: Date.now(),
+                value: baseValue,
+                pct: 0,
+            }];
+        }
 
+        let data = working;
+
+        // If only one snapshot, duplicate for chart rendering
         if (data.length === 1) {
             data = [
                 data[0],
@@ -107,15 +95,16 @@ export default function PerformanceChart({
             ];
         }
 
-        // Use safePlPct logic: if baseline too small, return 0% (not division by zero)
-        const safeBase = baseValue > 1 ? baseValue : undefined;
-
+        // Calculate % from baseline (netDeposits for All Time, seasonBaseline for Season)
         return data.map(point => ({
             timestamp: point.timestamp,
             value: point.value,
-            pct: safeBase ? ((point.value - safeBase) / safeBase) * 100 : 0,
+            // % change from baseline (supports negative)
+            pct: baseValue > 0
+                ? ((point.value - baseValue) / baseValue) * 100
+                : 0,
         }));
-    }, [snapshots, scope, entityId, cutoff, mode, seasonBaseline, seasonStart]);
+    }, [snapshots, scope, entityId, cutoff, mode, netDeposits, seasonBaseline]);
 
     const latest = series[series.length - 1] || { value: 0, pct: 0, timestamp: Date.now() };
     const first = series[0] || latest;

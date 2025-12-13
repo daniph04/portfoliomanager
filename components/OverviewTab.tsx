@@ -350,6 +350,7 @@ export default function OverviewTab({ group, helpers }: OverviewTabProps) {
                             entityId={group.id}
                             timeframe={timeframe}
                             mode={displayMode}
+                            netDeposits={group.members.reduce((sum, m) => sum + (m.netDeposits || 0), 0)}
                             seasonBaseline={displayMode === "season" ? metrics.baseline : undefined}
                             seasonStart={displayMode === "season" && currentSeason ? new Date(currentSeason.startTime).getTime() : undefined}
                             showControls
