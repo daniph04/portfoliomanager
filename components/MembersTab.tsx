@@ -75,9 +75,11 @@ export default function MembersTab({ group, selectedMemberId, currentProfileId, 
 
     const chartSnapshots = useMemo(() => {
         if (!selectedMember) return [];
+        // Pass all history - PerformanceChart filters internally using scope + entityId
         if (group.portfolioHistory.length > 0) {
-            return group.portfolioHistory.filter(p => (p.entityId || p.memberId) === selectedMember.id);
+            return group.portfolioHistory;
         }
+        // Fallback for empty history
         return [{
             id: `fallback_${selectedMember.id}`,
             timestamp: Date.now(),
