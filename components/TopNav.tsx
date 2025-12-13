@@ -137,7 +137,14 @@ export default function TopNav({ currentTab, onTabChange, groupName, currentProf
                                         : "bg-slate-800/50 border border-transparent text-slate-400 hover:bg-slate-800"
                                         }`}
                                 >
-                                    <span className="font-semibold">{group.name}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-semibold">{group.name}</span>
+                                        {group.type === 'private' && (
+                                            <span className="text-[10px] font-medium text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">
+                                                Private
+                                            </span>
+                                        )}
+                                    </div>
                                     {group.id === currentGroup?.id && (
                                         <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
                                     )}
