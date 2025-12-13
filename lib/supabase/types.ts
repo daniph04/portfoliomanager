@@ -33,6 +33,7 @@ export interface Group {
     name: string;
     password_hash: string;
     created_by: string;          // FK → user_profiles
+    type: 'private' | 'shared';  // private = auto-created solo, shared = multi-member league
     created_at: string;
 }
 

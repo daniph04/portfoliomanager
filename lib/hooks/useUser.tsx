@@ -99,7 +99,7 @@ interface UserContextType {
     getUserHoldings: (userId?: string) => UserHolding[];
 
     // Group actions
-    createGroup: (name: string, password: string) => Promise<Group | null>;
+    createGroup: (name: string, password: string, isPrivate?: boolean) => Promise<Group | null>;
     joinGroup: (name: string, password: string) => Promise<{ success: boolean; error?: string; group?: Group }>;
     leaveGroup: (groupId: string) => Promise<void>;
     setCurrentGroup: (groupId: string) => void;
@@ -561,7 +561,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }, [holdings, authUser]);
 
     // Create group
-    const createGroup = async (name: string, password: string): Promise<Group | null> => {
+    const createGroup = async (name: string, password: string, isPrivate: boolean = false): Promise<Group | null> => {
         if (!authUser) return null;
 
         const { data, error } = await supabase
@@ -570,6 +570,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
                 name: name.trim(),
                 password_hash: btoa(password),
                 created_by: authUser.id,
+                type: isPrivate ? 'private' : 'shared',  // Set type based on isPrivate flag
             })
             .select()
             .single();

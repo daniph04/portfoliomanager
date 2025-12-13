@@ -10,6 +10,7 @@ export default function SetupPage() {
     const router = useRouter();
     const {
         currentUser,
+        currentGroup,
         isAuthenticated,
         isLoading,
         updateUser,
@@ -48,7 +49,27 @@ export default function SetupPage() {
                 cashBalance: value,
                 netDeposits: value  // Track initial deposit
             });
-            setStep("group");
+
+            // AUTO-CREATE PRIVATE GROUP if user has no groups
+            // This ensures dashboard always has a valid currentGroup
+            if (!currentGroup) {
+                // Create private "My Portfolio" group
+                const privateGroup = await createGroup(
+                    "My Portfolio",
+                    Math.random().toString(36),  // Random password (user won't need it)
+                    true  // isPrivate flag = true
+                );
+
+                if (privateGroup) {
+                    await setCurrentGroup(privateGroup.id);
+                }
+
+                // Skip group step, go directly to dashboard
+                router.push('/dashboard');
+            } else {
+                // User already has a group, proceed to group selection
+                setStep("group");
+            }
         } catch (error) {
             console.error("Error updating user:", error);
         } finally {
